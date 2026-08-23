@@ -42,6 +42,16 @@
       "expo-font",
       "expo-web-browser",
       "expo-av",
+      "expo-device",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#1A2B5F",
+          "defaultChannel": "britbee-default",
+          "sounds": []
+        }
+      ],
       [
         "expo-image-picker",
         {

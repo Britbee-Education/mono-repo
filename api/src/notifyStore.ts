@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { ACTIVITY_IDS, type ActivityId } from "./activityStore";
+import { sendPushToUsers } from "./pushSend";
 
 export type NotifyKind = "general" | "activity" | "class";
 
@@ -503,6 +504,22 @@ export const notifyBoard = {
     }
     s.__britbeeNotify!.messages = s.__britbeeNotify!.messages.slice(0, 2000);
     persist();
+
+    // Phone popup (Expo Push → FCM/APNs). Non-blocking; inbox already saved.
+    sendPushToUsers(
+      made.map((m) => ({
+        userId: m.learnerId,
+        title: m.title,
+        body: m.body,
+        data: {
+          messageId: m.id,
+          kind: m.kind,
+          href: m.href || "/(main)/inbox",
+          source: m.source,
+        },
+      }))
+    );
+
     return made;
   },
 };

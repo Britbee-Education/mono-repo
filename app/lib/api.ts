@@ -538,6 +538,24 @@ export const api = {
     if (!token) return;
     await request("/notifications/pref", { method: "PATCH", body: JSON.stringify({ enabled }) }, token).catch(() => undefined);
   },
+  registerPushToken: async (pushToken: string, platform: "ios" | "android" | "web" | "unknown" = "unknown") => {
+    const token = await storageGet(TOKEN_KEY);
+    if (!token) return;
+    await request(
+      "/notifications/push-token",
+      { method: "POST", body: JSON.stringify({ token: pushToken, platform }) },
+      token
+    ).catch(() => undefined);
+  },
+  unregisterPushToken: async (pushToken?: string) => {
+    const token = await storageGet(TOKEN_KEY);
+    if (!token) return;
+    await request(
+      "/notifications/push-token",
+      { method: "DELETE", body: JSON.stringify({ token: pushToken }) },
+      token
+    ).catch(() => undefined);
+  },
   hive: async () => {
     const token = await storageGet(TOKEN_KEY);
     if (!token) return null;

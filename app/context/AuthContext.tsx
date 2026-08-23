@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { api, type ApiUser, type OtpPurpose } from "@/lib/api";
+import { unregisterPush } from "@/lib/push";
 
 type AuthContextValue = {
   user: ApiUser | null;
@@ -74,6 +75,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(u);
       },
       async signOut() {
+        await unregisterPush().catch(() => undefined);
         await api.clearToken();
         setUser(null);
       },

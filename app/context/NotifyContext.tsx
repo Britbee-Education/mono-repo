@@ -1,7 +1,9 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { AppState } from "react-native";
+import { AppState, Platform } from "react-native";
+import { useRouter } from "expo-router";
 import { api, type InboxItem } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import { Notifications, registerForPush, unregisterPush } from "@/lib/push";
 
 type Ctx = {
   items: InboxItem[];
@@ -18,8 +20,15 @@ function sameJson(a: unknown, b: unknown) {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
+function hrefFromData(data: Record<string, unknown> | undefined): string {
+  const href = typeof data?.href === "string" ? data.href : "";
+  if (href.startsWith("/") || href.startsWith("(")) return href;
+  return "/(main)/inbox";
+}
+
 export function NotifyProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
+  const router = useRouter();
   const [items, setItems] = useState<InboxItem[]>([]);
   const [unread, setUnread] = useState(0);
   const [enabled, setEnabledState] = useState(true);
@@ -50,6 +59,9 @@ export function NotifyProvider({ children }: { children: React.ReactNode }) {
   const setEnabled = useCallback(async (on: boolean) => {
     setEnabledState(on);
     await api.setNotifyPref(on);
+    if (Platform.OS === "web") return;
+    if (on) await registerForPush().catch(() => null);
+    else await unregisterPush().catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -63,6 +75,38 @@ export function NotifyProvider({ children }: { children: React.ReactNode }) {
       sub.remove();
     };
   }, [refresh]);
+
+  // Phone popup registration + tap → deep link into inbox / activity.
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+    if (!user || !enabled) {
+      void unregisterPush().catch(() => undefined);
+      return;
+    }
+
+    let alive = true;
+    void registerForPush().catch(() => null);
+
+    const received = Notifications.addNotificationReceivedListener(() => {
+      if (alive) void refresh();
+    });
+    const response = Notifications.addNotificationResponseReceivedListener((event) => {
+      const data = event.notification.request.content.data as Record<string, unknown> | undefined;
+      const href = hrefFromData(data);
+      try {
+        router.push(href as never);
+      } catch {
+        router.push("/(main)/inbox" as never);
+      }
+      void refresh();
+    });
+
+    return () => {
+      alive = false;
+      received.remove();
+      response.remove();
+    };
+  }, [user, enabled, refresh, router]);
 
   const value = useMemo<Ctx>(
     () => ({

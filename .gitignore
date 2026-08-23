@@ -39,3 +39,7 @@ coverage/
 
 # Local API data
 api/data/
+
+# Firebase / FCM credentials (upload via EAS — never commit)
+**/google-services.json
+**/GoogleService-Info.plist

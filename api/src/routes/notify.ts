@@ -4,6 +4,7 @@ import { canSeeClass, classStatus, packLiveClass, notifyBoard } from "../notifyS
 import { creditClassEndReward } from "../classRewards";
 import { progressLearnerId } from "../progressKey";
 import { users } from "../users";
+import { pushStore } from "../pushStore";
 
 export const notifyRouter = Router();
 
@@ -85,4 +86,24 @@ notifyRouter.patch("/pref", (req: AuthedRequest, res) => {
   const enabled = Boolean(req.body?.enabled);
   notifyBoard.setPref(String(req.user!._id), enabled);
   return res.json({ enabled });
+});
+
+notifyRouter.post("/push-token", (req: AuthedRequest, res) => {
+  const token = typeof req.body?.token === "string" ? req.body.token.trim() : "";
+  const platformRaw = typeof req.body?.platform === "string" ? req.body.platform : "unknown";
+  const platform =
+    platformRaw === "ios" || platformRaw === "android" || platformRaw === "web" ? platformRaw : "unknown";
+  if (!token) return res.status(400).json({ error: "Push token required." });
+  try {
+    const device = pushStore.upsert(String(req.user!._id), token, platform);
+    return res.json({ ok: true, device: { platform: device.platform, updatedAt: device.updatedAt } });
+  } catch (e) {
+    return res.status(400).json({ error: e instanceof Error ? e.message : "Could not save push token." });
+  }
+});
+
+notifyRouter.delete("/push-token", (req: AuthedRequest, res) => {
+  const token = typeof req.body?.token === "string" ? req.body.token.trim() : undefined;
+  const removed = pushStore.remove(String(req.user!._id), token);
+  return res.json({ ok: true, removed });
 });

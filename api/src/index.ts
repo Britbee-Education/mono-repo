@@ -18,6 +18,7 @@ import { memoryDb } from "./memory";
 import { ttsProvider } from "./utils/tts";
 import { sttReady } from "./utils/stt";
 import { apiIndexHtml } from "@britbee/config";
+import { pushStore } from "./pushStore";
 
 const PORT = Number(process.env.API_PORT || 3001);
 const MONGODB_URI = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/britbee";
@@ -80,7 +81,10 @@ async function main() {
           : "")
     );
     startNotifyTick();
-    console.log("[api] Notifications: in-app inbox (FCM-free), daily tick every 30s IST");
+    const pushOn = process.env.PUSH_ENABLED !== "0";
+    console.log(
+      `[api] Notifications: inbox + Expo Push/FCM ${pushOn ? "ON" : "OFF"} · ${pushStore.count()} device token(s) · daily tick 30s IST`
+    );
   });
 }
 

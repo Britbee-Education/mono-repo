@@ -13,7 +13,7 @@ Kids learn in the app. Parents guide from the **in-app parent shell**. Mentors r
 |-------|------------|-------|----------------|
 | 📱 **Kids + Parent App** | Daily practice, quests, chat, live class join + parent PIN shell | **Expo 54** · **React Native** · **React 19** · **expo-router** | Expo Go / iOS / Android / Web |
 | 🧭 **Office** | Mentor cockpit — learners, classes, billing, activities, roster | **Next.js 15** · **React 19** · **Lucide** | `:3003` |
-| 🔌 **API** | Auth, progress, speech, notify, billing, guide tools | **Node 20+** · **Express** · **TypeScript** · **Zod** | `:3001` |
+| 🔌 **API** | Auth, progress, speech, notify + Expo Push, billing, guide tools | **Node 20+** · **Express** · **TypeScript** · **Zod** | `:3001` |
 | 📦 **Shared** | Contracts + SEO config shared across apps | `@britbee/shared` · `@britbee/config` · **Zod** | workspace packages |
 
 ```
@@ -54,18 +54,18 @@ Kids learn in the app. Parents guide from the **in-app parent shell**. Mentors r
 | 👂 **STT / listen** | **Groq Whisper** (optional) | Better phonics scoring when `GROQ_API_KEY` is set |
 | 📸 **Media** | expo-av · image-picker · document-picker · **multer** | Voice, photos, files for class & chat |
 | 💳 **Billing** | In-house subscription store (simulated for now) | Parent shell ↔ Office stay in sync |
-| 🔔 **Notifications** | In-app inbox (**FCM-free** today) | Mentors buzz kids without Firebase yet |
+| 🔔 **Notifications** | **In-app inbox** + **Expo Push** → **FCM** (Android) / **APNs** (iOS) | Mentors buzz kids; phone popups even when the app is closed |
+| ☁️ **Push relay** | Expo Push HTTP API (`exp.host`) | Free tier for launch; API stores device tokens, fans out on mentor send |
 | 🎬 **Live class** | Book / go-live / join room flow | Mentors start; kids tap Join |
 | 💾 **Database (dev)** | File-backed JSON (`api/data/…`) | Zero infra — restart-safe local hive |
 | 🍃 **Database (prod path)** | **MongoDB** via **Mongoose** | Flip `MEMORY_DB=0` → Atlas-ready |
-| 🧹 **Tooling** | ESLint · Expo Go · dotenv · CORS | Clean DX from laptop to classroom |
+| 🧹 **Tooling** | ESLint · Expo Go · EAS · dotenv · CORS | Clean DX from laptop to classroom |
 
 ### 🚫 Intentionally *not* in the stack (yet)
 
 | Skipped | Status |
 |---------|--------|
 | 🌐 Separate parent website | ❌ Removed — parents live in the app shell |
-| 🔥 Firebase / FCM push | ❌ Not configured — inbox only for now |
 | 💸 Stripe / Razorpay | ❌ Billing is simulated; gateway later |
 | ☁️ Prod host wiring | 🔜 Ready to plug (Atlas + your host of choice) |
 
@@ -172,6 +172,35 @@ Still run `pnpm dev:app` separately for Expo.
 ## 📲 Expo Go note
 
 Play Store Expo Go supports **SDK 54**. This app targets **SDK 54** so the QR just works. Keep Expo Go updated! ✨
+
+---
+
+## 🔔 Push notifications (phone popups)
+
+Mentors send from **Office** → API writes the **inbox** and fans out an **Expo Push** message. Expo delivers via **FCM** (Android) and **APNs** (iOS) so kids get a real OS popup — lock screen / banner — not just an in-app badge.
+
+| Piece | Role |
+|-------|------|
+| `expo-notifications` + `expo-device` | Permission, Expo push token, Android channel `britbee-default`, tap → deep link |
+| `POST/DELETE /notifications/push-token` | App registers / clears device tokens after login / logout |
+| `api/src/pushStore.ts` | Persists tokens in `api/data/push-devices.json` (gitignored) |
+| `api/src/pushSend.ts` | Batches to `https://exp.host/--/api/v2/push/send` |
+| Mentor **Notify** panel | Selected kids, or whole hive if none selected |
+
+### Local / Expo Go
+
+1. Run API + app; sign in on a **physical phone** (simulators rarely get push).
+2. Allow notifications when prompted — token is saved automatically.
+3. From Office, send a buzz → phone should popup within seconds.
+4. Toggle off with `PUSH_ENABLED=0` on the API if you need to silence sends.
+
+### Production (EAS + FCM/APNs)
+
+1. In `./app`: `npx eas init` — copies the project id into `app.json` → `extra.eas.projectId` (or set `EXPO_PUBLIC_EAS_PROJECT_ID`).
+2. **Android:** create a Firebase project, download `google-services.json`, upload FCM V1 credentials in [EAS credentials](https://docs.expo.dev/push-notifications/fcm-credentials/) (`eas credentials`).
+3. **iOS:** upload an APNs key via EAS credentials.
+4. Build a store/preview binary (`eas build`) — Expo Go is fine for early tests; production popups need your own FCM/APNs credentials on a release build.
+5. Keep `PUSH_ENABLED` unset (default on). Set `PUSH_ENABLED=0` only to kill push while leaving inbox intact.
 
 ---
 
