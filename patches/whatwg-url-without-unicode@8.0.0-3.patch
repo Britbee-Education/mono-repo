@@ -1,0 +1,22 @@
+diff --git a/lib/url-state-machine.js b/lib/url-state-machine.js
+index 26b7596..3fbbe08 100644
+--- a/lib/url-state-machine.js
++++ b/lib/url-state-machine.js
+@@ -1,5 +1,5 @@
+ "use strict";
+-const { Buffer } = require("buffer/");
++const { Buffer } = require("buffer");
+ const punycode = require("punycode");
+ 
+ const infra = require("./infra");
+diff --git a/lib/urlencoded.js b/lib/urlencoded.js
+index 462ee22..abea681 100644
+--- a/lib/urlencoded.js
++++ b/lib/urlencoded.js
+@@ -1,5 +1,5 @@
+ "use strict";
+-const { Buffer } = require("buffer/");
++const { Buffer } = require("buffer");
+ 
+ const { isASCIIHex } = require("./infra");
+ 

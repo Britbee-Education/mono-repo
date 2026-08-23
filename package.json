@@ -1,0 +1,21 @@
+{
+  "name": "britbee",
+  "private": true,
+  "scripts": {
+    "dev:api": "pnpm --filter @britbee/api dev",
+    "dev:app": "pnpm --filter @britbee/app start",
+    "dev:office": "pnpm --filter @britbee/office dev",
+    "dev:office:fresh": "pnpm --filter @britbee/office dev:fresh",
+    "seed": "pnpm --filter @britbee/api seed",
+    "dev:webs": "pnpm --parallel --filter @britbee/office --filter @britbee/api dev"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "pnpm": {
+    "patchedDependencies": {
+      "whatwg-url-without-unicode@8.0.0-3": "patches/whatwg-url-without-unicode@8.0.0-3.patch"
+    }
+  }
+}

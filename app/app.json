@@ -1,0 +1,63 @@
+{
+  "expo": {
+    "name": "BritBee",
+    "slug": "britbee",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "britbee",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "description": "BritBee helps children from K3 to K8 build practical English communication skills through pronunciation, speaking, reading, vocabulary, grammar and daily practice.",
+    "splash": {
+      "image": "./assets/logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFFFFF"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.britbee.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#FFFFFF"
+      },
+      "package": "com.britbee.app",
+      "usesCleartextTraffic": true,
+      "softwareKeyboardLayoutMode": "resize"
+    },
+    "web": {
+      "favicon": "./assets/icon.png",
+      "bundler": "metro",
+      "name": "BritBee — Practical English Learning for Kids",
+      "shortName": "BritBee",
+      "lang": "en-IN",
+      "themeColor": "#1A2B5F",
+      "backgroundColor": "#FFFFFF"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-font",
+      "expo-web-browser",
+      "expo-av",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "BritBee needs access to your photos so you can share them in chat.",
+          "cameraPermission": "BritBee needs camera access so you can share photos in chat."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": false
+    },
+    "extra": {
+      "apiUrl": "http://localhost:3001",
+      "router": {
+        "origin": "https://britbee.app"
+      }
+    }
+  }
+}
