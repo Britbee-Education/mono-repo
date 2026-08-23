@@ -53,7 +53,7 @@ Kids learn in the app. Parents guide from the **in-app parent shell**. Mentors r
 | 🗣️ **TTS** | **Microsoft Edge neural voices** (free) | Natural British English — no key required |
 | 👂 **STT / listen** | **Groq Whisper** (optional) | Better phonics scoring when `GROQ_API_KEY` is set |
 | 📸 **Media** | expo-av · image-picker · document-picker · **multer** | Voice, photos, files for class & chat |
-| 💳 **Billing** | **BritBee Pay** custom UPI/GPay QR gateway + mentor activation | Parents pay QR → upload UTR/screenshot → mentors activate in Office |
+| 💳 **Billing** | **BritBee Pay** — custom UPI/GPay QR gateway, proof upload, mentor activation (`billingStore` + parent/Office UI) | Parents pay QR → UTR/screenshot → mentors activate; no Stripe/Razorpay for launch |
 | 🔔 **Notifications** | **In-app inbox** + **Expo Push** → **FCM** / **APNs** + **Zoho ZeptoMail** | Mentors buzz kids; phone popups + parental email for login, reminders, reports & billing |
 | ☁️ **Push relay** | Expo Push HTTP API (`exp.host`) | Free tier for launch; API stores device tokens, fans out on mentor send |
 | 📧 **Email** | **Zoho ZeptoMail** (transactional REST API) | Login alerts, class/practice reminders, student reports, BritBee Pay updates to parents |
@@ -176,26 +176,61 @@ Play Store Expo Go supports **SDK 54**. This app targets **SDK 54** so the QR ju
 
 ---
 
-## 💳 BritBee Pay (parent shell ↔ mentor Office)
+## 💳 BritBee Pay (custom payment gateway)
 
-Custom payment gateway (no Stripe/Razorpay fees for launch):
+In-house UPI/GPay checkout — looks like a real gateway, settles via mentor verification (no Stripe/Razorpay fees for launch).
 
-1. Parent picks Monthly/Yearly in the **parent shell** → BritBee Pay opens with mentor **GPay/UPI QR**.
-2. Parent pays outside the app, then enters a **UPI transaction ID** and/or uploads a **screenshot**.
-3. Payment moves to **processing** — kids keep waiting until a mentor verifies.
-4. Mentor opens **Office → Learners → Billing**, reviews UTR/screenshot, taps **Activate plan**.
-5. Subscription syncs to the parent shell instantly.
+### Architecture
 
-Configure mentor UPI in `.env`:
+```
+ Parent shell (Expo)                 BritBee API                      Mentor Office (Next.js)
+ ┌─────────────────────┐            ┌──────────────────────┐         ┌─────────────────────┐
+ │ BritBeePayPanel     │  checkout  │ billingStore         │ pending │ ParentBillingPanel  │
+ │  · plan + amount    │───────────▶│  · Payment           │────────▶│  · UTR / screenshot │
+ │  · UPI QR / intent  │            │  · Subscription      │         │  · Activate / Reject│
+ │  · txn ID + proof   │  proof     │  · Invoice           │ confirm │                     │
+ │  · waiting state    │───────────▶│  · ParentActivity    │◀────────│                     │
+ └─────────────────────┘            └──────────┬───────────┘         └─────────────────────┘
+                                               │
+                                               ▼
+                                    ZeptoMail (optional) + parentSettings sync
+```
+
+**Status machine:** `pending` (QR shown) → `processing` (proof submitted) → `succeeded` / `failed` (mentor action). Parents cannot self-activate.
+
+### Stack pieces
+
+| Layer | Path / tech | Role |
+|-------|-------------|------|
+| 🧠 **Domain store** | `api/src/billingStore.ts` | Plans (trial / monthly / yearly), payments, invoices, activity log, UPI intent + QR session |
+| 🔌 **Parent API** | `api/src/routes/billing.ts` | `POST /billing/checkout`, `GET …/gateway`, `POST …/submit-proof`, `POST …/proof` (multer upload) |
+| 🧭 **Mentor API** | `api/src/routes/guide.ts` → `/guide/billing/*` | Pending queue, confirm / fail, manual checkout, set plan |
+| 🔄 **Plan sync** | `api/src/billingSync.ts` | Writes `parentSettings` (plan, status, renews) onto the user after activation |
+| 📱 **Parent UI** | `app/components/parent/BritBeePayPanel.tsx` | Gateway chrome: QR, share VPA, open UPI app, txn ID, screenshot, waiting state |
+| 🖥️ **Office UI** | `office/components/ParentBillingPanel.tsx` | Review UTR + screenshot, activate / reject, household billing |
+| 🗄️ **Persist** | `api/data/billing.json` (gitignored) | File-backed in `MEMORY_DB=1`; same shapes ready for Mongo |
+| 🖼 **Proofs** | `app/assets/billing/proofs/` (gitignored) | Uploaded screenshots served at `/assets/billing/proofs/…` |
+| 📧 **Email** | ZeptoMail via `logActivity` | Parents get billing / plan emails when configured |
+
+### Checkout flow
+
+1. Parent picks **Monthly / Yearly** in the parent shell → `POST /billing/checkout` creates a `pending` payment + `orderRef`.
+2. `gatewaySession()` builds `upi://pay?pa=…&am=…&tr=…` and a QR (auto via qrserver, or `BILLING_UPI_QR_URL`).
+3. Parent pays in GPay / PhonePe / any UPI app, then submits **transaction ID** and/or **screenshot**.
+4. Payment → `processing`; UI polls until mentor acts.
+5. Mentor reviews in Office → **Activate plan** (`confirmPaymentByGuide`) creates invoice, flips subscription, syncs `parentSettings`.
+6. Parent shell refreshes — plan shows active. Reject path marks `failed` with a note.
+
+### Configure mentor GPay / UPI
 
 ```
 BILLING_UPI_VPA=mentor@oksbi
 BILLING_UPI_NAME=BritBee Mentors
-# optional custom QR image:
-# BILLING_UPI_QR_URL=https://…
+# optional hosted QR image instead of auto-generated UPI QR:
+# BILLING_UPI_QR_URL=https://cdn.example.com/mentor-gpay-qr.png
 ```
 
-Proof screenshots are stored under `app/assets/billing/proofs/` (gitignored upload folder).
+Amounts are stored in **paise** (INR × 100). Default plans: Hive Trial (₹0 / 7d), Monthly (₹499 / 30d), Yearly (₹4,999 / 365d).
 
 
 ## 📧 Zoho ZeptoMail (parental email)
