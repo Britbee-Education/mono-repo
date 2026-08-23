@@ -1,19 +1,41 @@
-node_modules
-.expo
-.expo-shared
-dist
-build
-.next
-.turbo
-*.log
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Env / secrets
 .env
-.env.local
-.DS_Store
-coverage
+.env.*
+!.env.example
+!.env.local.example
+
+# Logs & caches
+*.log
+npm-debug.log*
+.eslintcache
 *.tsbuildinfo
-web-build
-ios
-android
-.idea
-.vscode
-api/data
+
+# Expo / React Native
+.expo/
+.expo-shared/
+dist/
+web-build/
+ios/
+android/
+
+# Next.js / build
+.next/
+.next-dev/
+.next-build/
+out/
+build/
+.turbo/
+
+# Coverage / IDE / OS
+coverage/
+.nyc_output/
+.idea/
+.vscode/
+.DS_Store
+
+# Local API data
+api/data/
