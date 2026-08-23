@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { mailBillingEvent, mailPracticeReport } from "./mail/mailer";
 
 export type PlanId = "trial" | "monthly" | "yearly";
 export type SubscriptionStatus = "trialing" | "active" | "past_due" | "cancelled" | "expired";
@@ -28,9 +29,28 @@ export type Payment = {
   status: PaymentStatus;
   method?: PaymentMethod;
   invoiceId?: string;
+  /** BritBee Pay order reference shown on the gateway screen */
+  orderRef?: string;
+  /** UPI / GPay transaction ID (UTR) entered by parent */
+  transactionId?: string;
+  /** Screenshot proof URL under /assets/billing/proofs */
+  proofUrl?: string;
+  submittedAt?: string;
+  reviewNote?: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
   createdAt: string;
   completedAt?: string;
   failureReason?: string;
+};
+
+export type GatewayConfig = {
+  provider: "britbee_pay";
+  displayName: string;
+  upiVpa: string;
+  payeeName: string;
+  instructions: string;
+  supportNote: string;
 };
 
 export type Invoice = {
@@ -157,6 +177,51 @@ function refreshSubscriptionStatus(sub: Subscription): Subscription {
   return sub;
 }
 
+export function getGatewayConfig(): GatewayConfig {
+  const upiVpa = (process.env.BILLING_UPI_VPA || "britbee@oksbi").trim();
+  const payeeName = (process.env.BILLING_UPI_NAME || "BritBee Mentors").trim();
+  return {
+    provider: "britbee_pay",
+    displayName: "BritBee Pay",
+    upiVpa,
+    payeeName,
+    instructions: "Scan the QR with GPay / PhonePe / any UPI app, pay the exact amount, then upload your screenshot or enter the UPI transaction ID.",
+    supportNote: "A mentor activates your plan after verifying the payment — usually within a few hours.",
+  };
+}
+
+export function buildUpiIntent(payment: Payment) {
+  const gateway = getGatewayConfig();
+  const rupees = (payment.amount / 100).toFixed(2);
+  const ref = payment.orderRef || `BB${payment.id}`;
+  const params = new URLSearchParams({
+    pa: gateway.upiVpa,
+    pn: gateway.payeeName,
+    am: rupees,
+    cu: "INR",
+    tn: `BritBee ${ref}`,
+    tr: ref,
+  });
+  return `upi://pay?${params.toString()}`;
+}
+
+export function gatewaySession(payment: Payment) {
+  const gateway = getGatewayConfig();
+  const upiIntent = buildUpiIntent(payment);
+  const customQr = (process.env.BILLING_UPI_QR_URL || "").trim();
+  const qrImageUrl =
+    customQr ||
+    `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(upiIntent)}`;
+  return {
+    gateway,
+    payment,
+    upiIntent,
+    qrImageUrl,
+    amountLabel: formatInr(payment.amount),
+    planLabel: planMeta(payment.planId).label,
+  };
+}
+
 export function ensureSubscription(userId: string): Subscription {
   const disk = loadDisk();
   let sub = disk.subscriptions.find((s) => s.userId === userId);
@@ -196,6 +261,24 @@ export function logActivity(
   disk.activity.unshift(item);
   disk.activity = disk.activity.slice(0, 500);
   saveDisk();
+
+  if (item.type === "practice") {
+    mailPracticeReport({
+      userId,
+      title: item.title,
+      detail: item.detail,
+      childName: item.childName,
+      meta: item.meta,
+    });
+  } else if (item.type === "payment" || item.type === "subscription" || item.type === "settings") {
+    mailBillingEvent({
+      userId,
+      title: item.title,
+      detail: item.detail,
+      type: item.type,
+    });
+  }
+
   return item;
 }
 
@@ -239,14 +322,16 @@ export function createCheckout(userId: string, planId: PlanId, method: PaymentMe
   if (existing.length) {
     throw new Error("Finish or cancel your pending payment first.");
   }
+  const id = nextId(disk);
   const payment: Payment = {
-    id: nextId(disk),
+    id,
     userId,
     planId,
     amount: meta.amount,
     currency: "INR",
     status: "pending",
     method,
+    orderRef: `BB${id.padStart(6, "0")}`,
     createdAt: new Date().toISOString(),
   };
   disk.payments.push(payment);
@@ -288,6 +373,53 @@ function activatePlan(userId: string, planId: PlanId) {
   refreshSubscriptionStatus(sub);
   saveDisk();
   return sub!;
+}
+
+export function submitPaymentProof(
+  userId: string,
+  paymentId: string,
+  input: { transactionId?: string; proofUrl?: string }
+) {
+  const disk = loadDisk();
+  const payment = disk.payments.find((p) => p.id === paymentId && p.userId === userId);
+  if (!payment) throw new Error("Payment not found.");
+  if (payment.status === "succeeded") throw new Error("This payment is already activated.");
+  if (payment.status === "failed" || payment.status === "cancelled") {
+    throw new Error("This payment can no longer be updated.");
+  }
+
+  const transactionId = String(input.transactionId || "").trim().replace(/\s+/g, "").toUpperCase();
+  const proofUrl = String(input.proofUrl || "").trim();
+  if (!transactionId && !proofUrl) {
+    throw new Error("Add a UPI transaction ID or upload a payment screenshot.");
+  }
+  if (transactionId && transactionId.length < 8) {
+    throw new Error("Transaction ID looks too short — paste the full UPI / UTR reference.");
+  }
+
+  payment.transactionId = transactionId || payment.transactionId;
+  payment.proofUrl = proofUrl || payment.proofUrl;
+  payment.submittedAt = new Date().toISOString();
+  payment.status = "processing";
+  payment.failureReason = undefined;
+  saveDisk();
+
+  const bits = [
+    payment.transactionId ? `Txn ${payment.transactionId}` : null,
+    payment.proofUrl ? "screenshot attached" : null,
+  ].filter(Boolean);
+  logActivity(userId, {
+    type: "payment",
+    title: "Payment submitted for review",
+    detail: `${planMeta(payment.planId).label} · ${formatInr(payment.amount)}${bits.length ? ` · ${bits.join(" · ")}` : ""}`,
+    meta: {
+      paymentId: payment.id,
+      transactionId: payment.transactionId,
+      proofUrl: payment.proofUrl,
+      awaiting: "mentor",
+    },
+  });
+  return payment;
 }
 
 export function confirmPayment(userId: string, paymentId: string) {
@@ -497,24 +629,40 @@ export function setPlanByGuide(userId: string, planId: PlanId, guideName: string
 
 export function confirmPaymentByGuide(userId: string, paymentId: string, guideName: string) {
   const result = confirmPayment(userId, paymentId);
+  const disk = loadDisk();
+  const payment = disk.payments.find((p) => p.id === paymentId && p.userId === userId);
+  if (payment) {
+    payment.reviewedBy = guideName;
+    payment.reviewedAt = new Date().toISOString();
+    payment.reviewNote = "Verified and activated by mentor";
+    saveDisk();
+  }
   logActivity(userId, {
     type: "payment",
-    title: "Payment confirmed by mentor",
-    detail: `${guideName} marked this payment received`,
+    title: "Plan activated by mentor",
+    detail: `${guideName} verified your BritBee Pay payment`,
     meta: { paymentId, guide: guideName, source: "office" },
   });
-  return result;
+  return { ...result, payment: payment || result.payment };
 }
 
 export function failPaymentByGuide(userId: string, paymentId: string, guideName: string, reason?: string) {
-  const payment = failPayment(userId, paymentId, reason);
+  const payment = failPayment(userId, paymentId, reason || "Could not verify payment proof");
+  const disk = loadDisk();
+  const row = disk.payments.find((p) => p.id === paymentId && p.userId === userId);
+  if (row) {
+    row.reviewedBy = guideName;
+    row.reviewedAt = new Date().toISOString();
+    row.reviewNote = reason || "Could not verify payment proof";
+    saveDisk();
+  }
   logActivity(userId, {
     type: "payment",
-    title: "Payment marked failed by mentor",
-    detail: guideName,
+    title: "Payment needs attention",
+    detail: `${guideName}: ${reason || "Could not verify payment proof"}`,
     meta: { paymentId, guide: guideName, source: "office" },
   });
-  return payment;
+  return row || payment;
 }
 
 export function createManualCheckout(userId: string, planId: PlanId, method: PaymentMethod, guideName: string) {

@@ -24,6 +24,13 @@ export type BillingPayment = {
   status: PaymentStatus;
   method?: PaymentMethod;
   invoiceId?: string;
+  orderRef?: string;
+  transactionId?: string;
+  proofUrl?: string;
+  submittedAt?: string;
+  reviewNote?: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
   createdAt: string;
   completedAt?: string;
   failureReason?: string;
@@ -115,7 +122,7 @@ export function paymentStatusLabel(status: PaymentStatus) {
     case "pending":
       return "Pending";
     case "processing":
-      return "Processing";
+      return "Awaiting review";
     case "succeeded":
       return "Paid";
     case "failed":

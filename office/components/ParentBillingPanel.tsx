@@ -189,14 +189,15 @@ export function ParentBillingPanel({ userId, parentName }: Props) {
 
       {pending.length ? (
         <>
-          <h3 className="section">Pending payments</h3>
+          <h3 className="section">Pending BritBee Pay reviews</h3>
+          <p className="hint">Parents pay via mentor GPay QR, then submit a UPI ID or screenshot. Activate only after you verify the transfer.</p>
           <div className="table-wrap">
             <table className="sheet">
               <thead>
                 <tr>
                   <th>Plan</th>
                   <th>Amount</th>
-                  <th>Method</th>
+                  <th>Proof</th>
                   <th>Started</th>
                   <th />
                 </tr>
@@ -204,9 +205,20 @@ export function ParentBillingPanel({ userId, parentName }: Props) {
               <tbody>
                 {pending.map((p) => (
                   <tr key={p.id}>
-                    <td>{planLabel(p.planId)}</td>
+                    <td>
+                      <div>{planLabel(p.planId)}</div>
+                      <span className="mini">{p.orderRef || p.id} · {p.status}</span>
+                    </td>
                     <td>{formatInr(p.amount)}</td>
-                    <td>{p.method?.toUpperCase() || "—"}</td>
+                    <td>
+                      {p.transactionId ? <div><code>{p.transactionId}</code></div> : null}
+                      {p.proofUrl ? (
+                        <a href={p.proofUrl} target="_blank" rel="noreferrer" className="table-link">
+                          View screenshot
+                        </a>
+                      ) : null}
+                      {!p.transactionId && !p.proofUrl ? <span className="mini">Waiting for parent proof</span> : null}
+                    </td>
                     <td>{relativeTime(p.createdAt)}</td>
                     <td>
                       <div className="row-actions">
@@ -214,19 +226,19 @@ export function ParentBillingPanel({ userId, parentName }: Props) {
                           type="button"
                           className="btn btn-yellow"
                           style={{ height: 34, fontSize: 12 }}
-                          disabled={Boolean(busy)}
+                          disabled={Boolean(busy) || (!p.transactionId && !p.proofUrl && p.status === "pending")}
                           onClick={() => act(`/guide/billing/parents/${userId}/payments/${p.id}/confirm`)}
                         >
-                          Confirm received
+                          Activate plan
                         </button>
                         <button
                           type="button"
                           className="btn btn-navy"
                           style={{ height: 34, fontSize: 12 }}
                           disabled={Boolean(busy)}
-                          onClick={() => act(`/guide/billing/parents/${userId}/payments/${p.id}/fail`, { reason: "Declined by mentor" })}
+                          onClick={() => act(`/guide/billing/parents/${userId}/payments/${p.id}/fail`, { reason: "Could not verify BritBee Pay proof" })}
                         >
-                          Mark failed
+                          Reject
                         </button>
                       </div>
                     </td>
@@ -402,8 +414,8 @@ export function ParentBillingQueue({ onSelectParent }: QueueProps) {
         </div>
       ) : null}
 
-      <h3 className="section">Pending payment queue</h3>
-      <p className="hint">Confirm when you receive UPI, card, or bank transfer — the parent app updates instantly.</p>
+      <h3 className="section">Pending BritBee Pay queue</h3>
+      <p className="hint">Verify UPI / GPay transfers, then activate — the parent shell updates instantly.</p>
       <div className="table-wrap">
         {pending.length ? (
           <table className="sheet">
@@ -411,7 +423,7 @@ export function ParentBillingQueue({ onSelectParent }: QueueProps) {
               <tr>
                 <th>Parent</th>
                 <th>Plan</th>
-                <th>Amount</th>
+                <th>Proof</th>
                 <th>Started</th>
                 <th />
               </tr>
@@ -425,8 +437,20 @@ export function ParentBillingQueue({ onSelectParent }: QueueProps) {
                     </Link>
                     {p.parent?.child?.childName ? <span className="mini"> · {p.parent.child.childName}</span> : null}
                   </td>
-                  <td>{planLabel(p.planId)}</td>
-                  <td>{formatInr(p.amount)}</td>
+                  <td>
+                    {planLabel(p.planId)}
+                    <div className="mini">{formatInr(p.amount)}</div>
+                  </td>
+                  <td>
+                    {p.transactionId ? <div><code>{p.transactionId}</code></div> : null}
+                    {p.proofUrl ? (
+                      <a href={p.proofUrl} target="_blank" rel="noreferrer" className="table-link">
+                        Screenshot
+                      </a>
+                    ) : (
+                      <span className="mini">{p.status === "processing" ? "Proof pending review" : "Awaiting parent proof"}</span>
+                    )}
+                  </td>
                   <td>{relativeTime(p.createdAt)}</td>
                   <td>
                     <button
@@ -436,7 +460,7 @@ export function ParentBillingQueue({ onSelectParent }: QueueProps) {
                       disabled={busy === p.id}
                       onClick={() => confirmPayment(p.userId, p.id)}
                     >
-                      {busy === p.id ? "…" : "Confirm"}
+                      {busy === p.id ? "…" : "Activate"}
                     </button>
                   </td>
                 </tr>

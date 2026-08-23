@@ -705,11 +705,41 @@ export const api = {
   billingCheckout: async (planId: "monthly" | "yearly", method: PaymentMethod) => {
     const token = await storageGet(TOKEN_KEY);
     if (!token) throw new ApiError("Not signed in", 401);
-    return request<{ payment: BillingPayment }>("/billing/checkout", {
+    return request<{ payment: BillingPayment; session?: BillingGatewaySession }>("/billing/checkout", {
       method: "POST",
       body: JSON.stringify({ planId, method }),
     }, token);
   },
+  billingGatewaySession: async (paymentId: string) => {
+    const token = await storageGet(TOKEN_KEY);
+    if (!token) throw new ApiError("Not signed in", 401);
+    return request<BillingGatewaySession>(`/billing/payments/${paymentId}/gateway`, {}, token);
+  },
+  billingSubmitProof: async (paymentId: string, body: { transactionId?: string; proofUrl?: string }) => {
+    const token = await storageGet(TOKEN_KEY);
+    if (!token) throw new ApiError("Not signed in", 401);
+    return request<{ payment: BillingPayment; session: BillingGatewaySession }>(
+      `/billing/payments/${paymentId}/submit-proof`,
+      { method: "POST", body: JSON.stringify(body) },
+      token
+    );
+  },
+  billingUploadProof: async (paymentId: string, form: FormData) => {
+    const token = await storageGet(TOKEN_KEY);
+    if (!token) throw new ApiError("Not signed in", 401);
+    const res = await fetch(`${API_URL}/billing/payments/${paymentId}/proof`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const message = typeof data.error === "string" ? data.error : "Could not upload screenshot.";
+      throw new ApiError(message, res.status);
+    }
+    return data as { proofUrl: string };
+  },
+  /** @deprecated Parents submit proof; mentors activate. Kept for older clients. */
   billingConfirmPayment: async (paymentId: string) => {
     const token = await storageGet(TOKEN_KEY);
     if (!token) throw new ApiError("Not signed in", 401);
@@ -790,9 +820,34 @@ export type BillingPayment = {
   status: "pending" | "processing" | "succeeded" | "failed" | "cancelled";
   method?: PaymentMethod;
   invoiceId?: string;
+  orderRef?: string;
+  transactionId?: string;
+  proofUrl?: string;
+  submittedAt?: string;
+  reviewNote?: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
   createdAt: string;
   completedAt?: string;
   failureReason?: string;
+};
+
+export type BillingGatewayConfig = {
+  provider: string;
+  displayName: string;
+  upiVpa: string;
+  payeeName: string;
+  instructions: string;
+  supportNote: string;
+};
+
+export type BillingGatewaySession = {
+  gateway: BillingGatewayConfig;
+  payment: BillingPayment;
+  upiIntent: string;
+  qrImageUrl: string;
+  amountLabel: string;
+  planLabel: string;
 };
 
 export type BillingInvoice = {

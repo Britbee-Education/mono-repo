@@ -18,14 +18,13 @@ import {
   type PaymentMethod,
 } from "@/lib/api";
 import { formatInr, subscriptionLabel } from "@/lib/billing";
+import { BritBeePayPanel } from "@/components/parent/BritBeePayPanel";
 import { colors, fonts } from "@/constants/theme";
 
 type Tab = "plan" | "pending" | "history" | "invoices";
 
 const METHODS: { id: PaymentMethod; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { id: "upi", label: "UPI", icon: "phone-portrait-outline" },
-  { id: "card", label: "Card", icon: "card-outline" },
-  { id: "netbanking", label: "Net banking", icon: "business-outline" },
+  { id: "upi", label: "BritBee Pay", icon: "qr-code-outline" },
 ];
 
 function StatusPill({ status }: { status: string }) {
@@ -105,20 +104,6 @@ export default function ParentBillingScreen() {
     }
   }
 
-  async function confirmPending(paymentId: string) {
-    setBusy(true);
-    try {
-      const res = await api.billingConfirmPayment(paymentId);
-      if (res.user) setUser(res.user);
-      setSubscription(res.subscription);
-      await refresh();
-      Alert.alert("Payment received", `${planById(res.payment.planId).name} is now active.`);
-    } catch (e) {
-      Alert.alert("Payment failed", isApiError(e) ? e.message : "Try again.");
-    } finally {
-      setBusy(false);
-    }
-  }
 
   async function cancelPending(paymentId: string) {
     setBusy(true);
@@ -280,17 +265,14 @@ export default function ParentBillingScreen() {
           {tab === "pending" ? (
             pending.length ? (
               pending.map((p) => (
-                <Card key={p.id}>
-                  <Text style={styles.optName}>{planById(p.planId).name}</Text>
-                  <Text style={styles.sub}>
-                    {formatInr(p.amount)} · {p.method?.toUpperCase() || "UPI"} · {p.status}
-                  </Text>
-                  <Text style={styles.note}>Complete payment in your UPI or banking app, then tap confirm.</Text>
-                  <View style={{ marginTop: 12, gap: 8 }}>
-                    <PillButton label="Confirm payment" variant="navy" loading={busy} onPress={() => void confirmPending(p.id)} />
-                    <PillButton label="Cancel" variant="outline" loading={busy} onPress={() => void cancelPending(p.id)} />
-                  </View>
-                </Card>
+                <BritBeePayPanel
+                  key={p.id}
+                  payment={p}
+                  busy={busy}
+                  onBusy={setBusy}
+                  onSubmitted={refresh}
+                  onCancel={() => void cancelPending(p.id)}
+                />
               ))
             ) : (
               <Card>

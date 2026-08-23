@@ -42,7 +42,6 @@
       "expo-font",
       "expo-web-browser",
       "expo-av",
-      "expo-device",
       [
         "expo-notifications",
         {

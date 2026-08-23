@@ -19,6 +19,7 @@ import { ttsProvider } from "./utils/tts";
 import { sttReady } from "./utils/stt";
 import { apiIndexHtml } from "@britbee/config";
 import { pushStore } from "./pushStore";
+import { mailStatusLine } from "./mail/zeptoMail";
 
 const PORT = Number(process.env.API_PORT || 3001);
 const MONGODB_URI = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/britbee";
@@ -85,6 +86,7 @@ async function main() {
     console.log(
       `[api] Notifications: inbox + Expo Push/FCM ${pushOn ? "ON" : "OFF"} · ${pushStore.count()} device token(s) · daily tick 30s IST`
     );
+    console.log(`[api] Email: ${mailStatusLine()}`);
   });
 }
 

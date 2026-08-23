@@ -23,6 +23,7 @@ import { isValidMobile, normalizePhone, phoneEmail } from "../utils/phone";
 import { generateOtp, saveOtp, consumeOtp } from "../otpStore";
 import { hanuConfigured, sendHanuSmsOtp } from "../utils/hanuOtp";
 import { memoryDb } from "../memory";
+import { mailLoginAlert, mailWelcomeParent } from "../mail/mailer";
 
 export const authRouter = Router();
 
@@ -93,6 +94,14 @@ authRouter.post("/login", async (req, res) => {
       return res.status(403).json({ error: `This account is not allowed on ${portal}` });
     }
   }
+
+  mailLoginAlert({
+    userId: String(user._id),
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    portal: portal || undefined,
+  });
 
   return res.json({ token: signToken(user), user: toPublicUser(user) });
 });
@@ -185,6 +194,10 @@ authRouter.post("/otp/verify", async (req, res) => {
 
   if (portal === "mobile" && user.role !== "learner" && user.role !== "parent") {
     return res.status(403).json({ error: "This account cannot use the kids app" });
+  }
+
+  if (isNew) {
+    mailWelcomeParent({ userId: String(user._id), name: user.name, email: (user as any).email });
   }
 
   return res.json({

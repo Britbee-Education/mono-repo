@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { ACTIVITY_IDS, type ActivityId } from "./activityStore";
 import { sendPushToUsers } from "./pushSend";
+import { mailNotifyToUsers } from "./mail/mailer";
 
 export type NotifyKind = "general" | "activity" | "class";
 
@@ -517,6 +518,18 @@ export const notifyBoard = {
           href: m.href || "/(main)/inbox",
           source: m.source,
         },
+      }))
+    );
+
+    
+    // Parental email (ZeptoMail) — same buzz / reminder / class copy.
+    mailNotifyToUsers(
+      made.map((m) => ({
+        userId: m.learnerId,
+        title: m.title,
+        body: m.body,
+        kind: m.kind,
+        source: m.source,
       }))
     );
 

@@ -43,3 +43,6 @@ api/data/
 # Firebase / FCM credentials (upload via EAS — never commit)
 **/google-services.json
 **/GoogleService-Info.plist
+
+# BritBee Pay proof uploads
+app/assets/billing/proofs/

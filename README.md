@@ -53,9 +53,10 @@ Kids learn in the app. Parents guide from the **in-app parent shell**. Mentors r
 | 🗣️ **TTS** | **Microsoft Edge neural voices** (free) | Natural British English — no key required |
 | 👂 **STT / listen** | **Groq Whisper** (optional) | Better phonics scoring when `GROQ_API_KEY` is set |
 | 📸 **Media** | expo-av · image-picker · document-picker · **multer** | Voice, photos, files for class & chat |
-| 💳 **Billing** | In-house subscription store (simulated for now) | Parent shell ↔ Office stay in sync |
-| 🔔 **Notifications** | **In-app inbox** + **Expo Push** → **FCM** (Android) / **APNs** (iOS) | Mentors buzz kids; phone popups even when the app is closed |
+| 💳 **Billing** | **BritBee Pay** custom UPI/GPay QR gateway + mentor activation | Parents pay QR → upload UTR/screenshot → mentors activate in Office |
+| 🔔 **Notifications** | **In-app inbox** + **Expo Push** → **FCM** / **APNs** + **Zoho ZeptoMail** | Mentors buzz kids; phone popups + parental email for login, reminders, reports & billing |
 | ☁️ **Push relay** | Expo Push HTTP API (`exp.host`) | Free tier for launch; API stores device tokens, fans out on mentor send |
+| 📧 **Email** | **Zoho ZeptoMail** (transactional REST API) | Login alerts, class/practice reminders, student reports, BritBee Pay updates to parents |
 | 🎬 **Live class** | Book / go-live / join room flow | Mentors start; kids tap Join |
 | 💾 **Database (dev)** | File-backed JSON (`api/data/…`) | Zero infra — restart-safe local hive |
 | 🍃 **Database (prod path)** | **MongoDB** via **Mongoose** | Flip `MEMORY_DB=0` → Atlas-ready |
@@ -66,7 +67,7 @@ Kids learn in the app. Parents guide from the **in-app parent shell**. Mentors r
 | Skipped | Status |
 |---------|--------|
 | 🌐 Separate parent website | ❌ Removed — parents live in the app shell |
-| 💸 Stripe / Razorpay | ❌ Billing is simulated; gateway later |
+| 💸 Stripe / Razorpay | ❌ Not needed for launch — BritBee Pay uses mentor GPay QR + manual verify |
 | ☁️ Prod host wiring | 🔜 Ready to plug (Atlas + your host of choice) |
 
 ---
@@ -174,6 +175,59 @@ Still run `pnpm dev:app` separately for Expo.
 Play Store Expo Go supports **SDK 54**. This app targets **SDK 54** so the QR just works. Keep Expo Go updated! ✨
 
 ---
+
+## 💳 BritBee Pay (parent shell ↔ mentor Office)
+
+Custom payment gateway (no Stripe/Razorpay fees for launch):
+
+1. Parent picks Monthly/Yearly in the **parent shell** → BritBee Pay opens with mentor **GPay/UPI QR**.
+2. Parent pays outside the app, then enters a **UPI transaction ID** and/or uploads a **screenshot**.
+3. Payment moves to **processing** — kids keep waiting until a mentor verifies.
+4. Mentor opens **Office → Learners → Billing**, reviews UTR/screenshot, taps **Activate plan**.
+5. Subscription syncs to the parent shell instantly.
+
+Configure mentor UPI in `.env`:
+
+```
+BILLING_UPI_VPA=mentor@oksbi
+BILLING_UPI_NAME=BritBee Mentors
+# optional custom QR image:
+# BILLING_UPI_QR_URL=https://…
+```
+
+Proof screenshots are stored under `app/assets/billing/proofs/` (gitignored upload folder).
+
+
+## 📧 Zoho ZeptoMail (parental email)
+
+Transactional email for parents — login alerts, mentor buzzes, class reminders, practice reports, and BritBee Pay updates.
+
+| Piece | Role |
+|-------|------|
+| `api/src/mail/zeptoMail.ts` | REST client → `https://api.zeptomail.com/v1.1/email` |
+| `api/src/mail/mailer.ts` | Login / notify / practice / billing / welcome helpers |
+| Auth `POST /login` | Emails a sign-in alert when the account has a real email |
+| `notifyBoard.deliver` | Same mentor / daily / class copy also emails parents |
+| Billing `logActivity` | Practice milestones + payment / plan emails |
+
+### Setup
+
+1. In [ZeptoMail](https://www.zoho.com/zeptomail/), verify your domain and create a Mail Agent.
+2. Copy the **Send Mail Token** (SMTP/API tab).
+3. Add to `.env`:
+
+```
+ZEPTOMAIL_TOKEN=Zoho-enczapikey ****************
+ZEPTOMAIL_FROM_EMAIL=noreply@your-domain.com
+ZEPTOMAIL_FROM_NAME=BritBee
+# Optional (India DC):
+# ZEPTOMAIL_API_URL=https://api.zeptomail.in/v1.1/email
+```
+
+4. Restart the API — boot log should show `Email: ZeptoMail ON · from …`.
+5. Synthetic phone emails (`*@phone.britbee.local`) are skipped; use a real parent email (or update the demo parent) to receive mail.
+
+Toggle off with `MAIL_ENABLED=0` without removing keys.
 
 ## 🔔 Push notifications (phone popups)
 
