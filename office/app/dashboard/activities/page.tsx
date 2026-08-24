@@ -10,7 +10,7 @@ import { sessionPlan } from "@/lib/today";
 import { StatusChip } from "@/components/StatusChip";
 import { DataListToolbar } from "@/components/DataListToolbar";
 import { RosterPanel } from "@/components/RosterPanel";
-import { downloadJson, readJsonFile } from "@/lib/dataTools";
+import { downloadJson } from "@/lib/dataTools";
 
 function labelOf(l: Learner) {
   return l.childLabel || l.child?.childName || l.name;

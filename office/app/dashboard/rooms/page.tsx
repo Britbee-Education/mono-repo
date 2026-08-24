@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { ACTIVITY_CATALOG } from "@/lib/activities";
+import { ACTIVITY_CATALOG, type ActivityId } from "@/lib/activities";
 import { DataListToolbar } from "@/components/DataListToolbar";
 import { downloadJson } from "@/lib/dataTools";
 
@@ -104,7 +104,7 @@ export default function MentorRoomsPage() {
         <h2 className="section-title">Publish a room</h2>
         <label className="field">
           <span>Activity</span>
-          <select value={activityId} onChange={(e) => setActivityId(e.target.value)}>
+          <select value={activityId} onChange={(e) => setActivityId(e.target.value as ActivityId)}>
             {ACTIVITY_CATALOG.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.name}

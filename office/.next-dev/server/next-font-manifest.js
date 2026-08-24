@@ -1,1 +1,1 @@
-self.__NEXT_FONT_MANIFEST="{\"pages\":{},\"app\":{},\"appUsingSizeAdjust\":false,\"pagesUsingSizeAdjust\":false}"
+self.__NEXT_FONT_MANIFEST="{\"pages\":{},\"app\":{\"/Users/agnisarvaloka/britbee/office/app/layout\":[\"static/media/54d173f197c29d93-s.p.otf\",\"static/media/333ab73b5541c2f6-s.p.otf\",\"static/media/6c3b16f6d0ef383f-s.p.otf\",\"static/media/04ca08d0bf127403-s.p.otf\",\"static/media/685a86e3efd026cd-s.p.otf\"]},\"appUsingSizeAdjust\":true,\"pagesUsingSizeAdjust\":false}"

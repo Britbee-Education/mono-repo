@@ -17,6 +17,7 @@ import {
   type BillingSubscription,
   type ParentActivity,
   type PaymentMethod,
+  type PendingWithParent,
   type PlanId,
 } from "@/lib/billing";
 
@@ -329,17 +330,7 @@ export function ParentBillingQueue({ onSelectParent }: QueueProps) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
   const [overview, setOverview] = useState<{ pendingCount: number; activeCount: number; pastDueCount: number; trialingCount: number } | null>(null);
-  const [pending, setPending] = useState<
-    Array<{
-      id: string;
-      userId: string;
-      planId: PlanId;
-      amount: number;
-      method?: PaymentMethod;
-      createdAt: string;
-      parent: { id: string; name: string; child?: { childName?: string } } | null;
-    }>
-  >([]);
+  const [pending, setPending] = useState<PendingWithParent[]>([]);
   const [parents, setParents] = useState<
     Array<{
       id: string;

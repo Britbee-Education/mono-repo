@@ -1,15 +1,17 @@
 /**
- * PM2 ecosystem for AIC Cloud VPS (API + Office).
- * Website + Expo web are static files served by Nginx.
+ * PM2 — API + Office on AIC Cloud VPS.
+ * Website + Expo web: Nginx static (see nginx-ip.conf.template).
  *
  *   pm2 start deploy/pm2.ecosystem.cjs
- *   pm2 reload deploy/pm2.ecosystem.cjs --update-env
  */
+const path = require("path");
+const root = path.resolve(__dirname, "..");
+
 module.exports = {
   apps: [
     {
       name: "britbee-api",
-      cwd: __dirname + "/../api",
+      cwd: path.join(root, "api"),
       script: "pnpm",
       args: "start",
       interpreter: "none",
@@ -19,7 +21,7 @@ module.exports = {
     },
     {
       name: "britbee-office",
-      cwd: __dirname + "/../office",
+      cwd: path.join(root, "office"),
       script: "pnpm",
       args: "start",
       interpreter: "none",
@@ -30,3 +32,6 @@ module.exports = {
     },
   ],
 };
+
+// PM2 7 startOrReload expects deploy key present
+module.exports.deploy = module.exports.deploy || {};

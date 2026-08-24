@@ -1,0 +1,24 @@
+# IP-first Nginx — marketing + Expo web. API/Office are PM2 on :3001 / :3003.
+# Bootstrap replaces DEPLOY_ROOT.
+
+server {
+  listen 80 default_server;
+  listen [::]:80 default_server;
+  server_name _;
+  root DEPLOY_ROOT/website/dist;
+  index index.html;
+  location / {
+    try_files $uri $uri/ /index.html;
+  }
+}
+
+server {
+  listen 8080;
+  listen [::]:8080;
+  server_name _;
+  root DEPLOY_ROOT/app/dist;
+  index index.html;
+  location / {
+    try_files $uri $uri/ /index.html;
+  }
+}

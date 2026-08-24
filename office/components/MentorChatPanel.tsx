@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, type CommonChatMessage, type MentorChatMessage } from "@/lib/api";
-import { messagePreview } from "@/lib/chatEngagement";
 import { ChatMessageBody } from "@/components/ChatMessageBody";
 import { ExternalLink, Send, Users } from "lucide-react";
 

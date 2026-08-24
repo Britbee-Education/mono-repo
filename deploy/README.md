@@ -19,10 +19,10 @@ Default hosts:
 
 | Host | Surface |
 |------|---------|
-| `britbee.app` | Marketing website (`website/dist`) |
-| `app.britbee.app` | Kids + parent **web app** (`app/dist` Expo export) |
-| `api.britbee.app` | API (PM2 → `:3001`) |
-| `office.britbee.app` | Backoffice (PM2 → `:3003`) |
+| `britbee.buzz` | Marketing website (`website/dist`) on **:80** |
+| `app.britbee.buzz` | Kids + parent **web app** (`app/dist`) on **:8080** (map this port in AIC) |
+| `api.britbee.buzz` | API (PM2 → **:3001**) |
+| `office.britbee.buzz` | Backoffice (PM2 → **:3003**) |
 
 ---
 
@@ -84,23 +84,26 @@ npm i -g pnpm@9 pm2
 2. Create an S3 bucket on [AceCloud Object Storage](https://acecloud.ai/cloud/storage/object/) → note endpoint, access key, secret, bucket.
 3. Put them in `.env.production` (see `env.production.example`).
 
-### 4. App on the VPS
+### 4. App on the VPS (first deploy)
+
+On the VPS (as root), with the public IP:
 
 ```bash
-git clone YOUR_REPO_URL britbee && cd britbee
-cp deploy/env.production.example .env.production
-# also: ln -sf .env.production .env   # API loads repo-root .env
-nano .env.production
-
-pnpm install
-pnpm --filter @britbee/website build
-pnpm --filter @britbee/office build
-cd app && EXPO_NO_METRO_WORKSPACE_ROOT=1 pnpm exec expo export --platform web && cd ..
-pnpm --filter @britbee/api seed   # once
-
-pm2 start deploy/pm2.ecosystem.cjs
-pm2 save && pm2 startup
+git clone https://github.com/Britbee-Education/mono-repo.git /opt/britbee
+cd /opt/britbee
+PUBLIC_IP=YOUR.VPS.IP bash deploy/bootstrap-vps.sh
 ```
+
+Until DNS is pointed, use:
+
+| Surface | URL |
+|---------|-----|
+| Website | `http://YOUR_IP/` |
+| Web app | `http://YOUR_IP:8080/` |
+| API | `http://YOUR_IP:3001/health` |
+| Office | `http://YOUR_IP:3003/` |
+
+Default first boot uses `MEMORY_DB=1` (file DB). Put HeavenCloud `MONGODB_URI` in `/opt/britbee/.env` later and `pm2 reload`.
 
 ### 5. Nginx
 
