@@ -25,8 +25,21 @@ else
 fi
 pm2 save
 
-sleep 2
-curl -fsS "http://127.0.0.1:3001/health" | head -c 240
+echo "==> health wait"
+ok=0
+for i in 1 2 3 4 5 6 7 8 9 10; do
+  if curl -fsS "http://127.0.0.1:3001/health" >/tmp/britbee-health.json 2>/dev/null; then
+    ok=1
+    break
+  fi
+  sleep 2
+done
+if [[ "$ok" != "1" ]]; then
+  echo "API health failed; pm2 logs:"
+  pm2 logs britbee-api --lines 40 --nostream || true
+  exit 1
+fi
+head -c 240 /tmp/britbee-health.json
 echo
 curl -fsS -o /dev/null -w "office:%{http_code}\n" "http://127.0.0.1:3003/" || true
 curl -fsS -o /dev/null -w "site:%{http_code}\n" -H "Host: britbee.buzz" "http://127.0.0.1/" || true
