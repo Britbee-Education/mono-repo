@@ -107,8 +107,8 @@ jobs:
     if: ${{ vars.VPS_DEPLOY_ENABLED == 'true' && needs.changes.outputs.any == 'true' }}
     runs-on: ubuntu-latest
     env:
-      EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL || 'http://api.britbee.buzz' }}
-      NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL || 'http://api.britbee.buzz' }}
+      EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL || 'https://api.britbee.buzz' }}
+      NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL || 'https://api.britbee.buzz' }}
       APP_DIR: ${{ vars.VPS_APP_DIR || '/opt/britbee' }}
     steps:
       - uses: actions/checkout@v4

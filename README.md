@@ -347,9 +347,9 @@ Nginx: [`deploy/nginx-britbee-buzz.conf`](./deploy/nginx-britbee-buzz.conf) · P
 MEMORY_DB=1
 JWT_SECRET=long-random
 API_PORT=3001
-EXPO_PUBLIC_API_URL=http://api.britbee.buzz
-NEXT_PUBLIC_API_URL=http://api.britbee.buzz
-MAIL_APP_URL=http://britbee.buzz
+EXPO_PUBLIC_API_URL=https://api.britbee.buzz
+NEXT_PUBLIC_API_URL=https://api.britbee.buzz
+MAIL_APP_URL=https://britbee.buzz
 ```
 
 4. Start processes:
@@ -451,8 +451,8 @@ Not multi-node HA. Fine for beta.
 |----------|---------|
 | `VPS_DEPLOY_ENABLED` | `true` |
 | `VPS_APP_DIR` | `/opt/britbee` |
-| `EXPO_PUBLIC_API_URL` | `http://api.britbee.buzz` |
-| `NEXT_PUBLIC_API_URL` | `http://api.britbee.buzz` |
+| `EXPO_PUBLIC_API_URL` | `https://api.britbee.buzz` |
+| `NEXT_PUBLIC_API_URL` | `https://api.britbee.buzz` |
 
 Without `VPS_DEPLOY_ENABLED=true`, pushes only run CI.
 
