@@ -1,28 +1,111 @@
 name: Deploy VPS
 
-# Auto-deploy on push to master/main:
-# 1) Build website + Office + Expo web in GitHub Actions (not on the 1GB VPS)
-# 2) rsync code + artifacts to /opt/britbee (never overwrites .env)
-# 3) SSH remote-release.sh → pnpm install + nginx + pm2 reload
+# Path-aware auto-deploy on push to master/main:
+# - Only build / rsync / reload what changed
+# - shared packages / lockfile → rebuild dependents + install
+# - workflow_dispatch → full deploy
 #
-# Prerequisites (repo Settings → Secrets / Variables):
-#   secrets: VPS_HOST, VPS_USER, VPS_SSH_KEY, VPS_PORT
-#   vars:    VPS_DEPLOY_ENABLED=true, VPS_APP_DIR=/opt/britbee
-#            EXPO_PUBLIC_API_URL, NEXT_PUBLIC_API_URL (e.g. http://api.britbee.buzz)
+# secrets: VPS_HOST, VPS_USER, VPS_SSH_KEY, VPS_PORT
+# vars:    VPS_DEPLOY_ENABLED=true, VPS_APP_DIR=/opt/britbee
+#          EXPO_PUBLIC_API_URL, NEXT_PUBLIC_API_URL
 
 on:
   push:
     branches: [master, main]
   workflow_dispatch:
+    inputs:
+      force_all:
+        description: Deploy all surfaces
+        type: boolean
+        default: true
 
 concurrency:
   group: deploy-vps
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  changes:
     runs-on: ubuntu-latest
     if: ${{ vars.VPS_DEPLOY_ENABLED == 'true' }}
+    outputs:
+      api: ${{ steps.set.outputs.api }}
+      office: ${{ steps.set.outputs.office }}
+      website: ${{ steps.set.outputs.website }}
+      app: ${{ steps.set.outputs.app }}
+      deploy: ${{ steps.set.outputs.deploy }}
+      deps: ${{ steps.set.outputs.deps }}
+      any: ${{ steps.set.outputs.any }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.force_all != true }}
+        with:
+          filters: |
+            api:
+              - 'api/**'
+            office:
+              - 'office/**'
+            website:
+              - 'website/**'
+            app:
+              - 'app/**'
+            deploy:
+              - 'deploy/**'
+              - '.github/workflows/deploy-vps.yml'
+            deps:
+              - 'packages/**'
+              - 'pnpm-lock.yaml'
+              - 'package.json'
+              - 'pnpm-workspace.yaml'
+              - '.npmrc'
+            shared:
+              - 'packages/**'
+      - id: set
+        env:
+          FORCE: ${{ github.event_name == 'workflow_dispatch' && inputs.force_all == true }}
+          F_API: ${{ steps.filter.outputs.api }}
+          F_OFFICE: ${{ steps.filter.outputs.office }}
+          F_WEBSITE: ${{ steps.filter.outputs.website }}
+          F_APP: ${{ steps.filter.outputs.app }}
+          F_DEPLOY: ${{ steps.filter.outputs.deploy }}
+          F_DEPS: ${{ steps.filter.outputs.deps }}
+          F_SHARED: ${{ steps.filter.outputs.shared }}
+        run: |
+          if [ "$FORCE" = "true" ]; then
+            api=true; office=true; website=true; app=true; deploy=true; deps=true
+          else
+            api=false; office=false; website=false; app=false; deploy=false; deps=false
+            [ "$F_API" = "true" ] && api=true
+            [ "$F_OFFICE" = "true" ] && office=true
+            [ "$F_WEBSITE" = "true" ] && website=true
+            [ "$F_APP" = "true" ] && app=true
+            [ "$F_DEPLOY" = "true" ] && deploy=true
+            [ "$F_DEPS" = "true" ] && deps=true
+            # shared packages affect api, office, app
+            if [ "$F_SHARED" = "true" ] || [ "$F_DEPS" = "true" ]; then
+              api=true; office=true; app=true; deps=true
+            fi
+          fi
+          any=false
+          for v in "$api" "$office" "$website" "$app" "$deploy" "$deps"; do
+            [ "$v" = "true" ] && any=true
+          done
+          {
+            echo "api=$api"
+            echo "office=$office"
+            echo "website=$website"
+            echo "app=$app"
+            echo "deploy=$deploy"
+            echo "deps=$deps"
+            echo "any=$any"
+          } >> "$GITHUB_OUTPUT"
+          echo "Deploy matrix: api=$api office=$office website=$website app=$app deploy=$deploy deps=$deps any=$any"
+
+  deploy:
+    needs: changes
+    if: ${{ vars.VPS_DEPLOY_ENABLED == 'true' && needs.changes.outputs.any == 'true' }}
+    runs-on: ubuntu-latest
     env:
       EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL || 'http://api.britbee.buzz' }}
       NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL || 'http://api.britbee.buzz' }}
@@ -31,24 +114,30 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
+        if: ${{ needs.changes.outputs.website == 'true' || needs.changes.outputs.office == 'true' || needs.changes.outputs.app == 'true' || needs.changes.outputs.deps == 'true' }}
         with:
           version: 9.15.0
 
       - uses: actions/setup-node@v4
+        if: ${{ needs.changes.outputs.website == 'true' || needs.changes.outputs.office == 'true' || needs.changes.outputs.app == 'true' || needs.changes.outputs.deps == 'true' }}
         with:
           node-version: 20
           cache: pnpm
 
       - name: Install
+        if: ${{ needs.changes.outputs.website == 'true' || needs.changes.outputs.office == 'true' || needs.changes.outputs.app == 'true' || needs.changes.outputs.deps == 'true' }}
         run: pnpm install --frozen-lockfile
 
       - name: Build website
+        if: ${{ needs.changes.outputs.website == 'true' }}
         run: pnpm --filter @britbee/website build
 
       - name: Build office
+        if: ${{ needs.changes.outputs.office == 'true' }}
         run: pnpm --filter @britbee/office build
 
       - name: Export Expo web
+        if: ${{ needs.changes.outputs.app == 'true' }}
         working-directory: app
         run: EXPO_NO_METRO_WORKSPACE_ROOT=1 pnpm exec expo export --platform web
 
@@ -59,34 +148,63 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p "${{ secrets.VPS_PORT }}" -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Rsync release (preserve server .env)
+      - name: Rsync changed paths
         env:
           HOST: ${{ secrets.VPS_HOST }}
           USER: ${{ secrets.VPS_USER }}
           PORT: ${{ secrets.VPS_PORT }}
+          DO_API: ${{ needs.changes.outputs.api }}
+          DO_OFFICE: ${{ needs.changes.outputs.office }}
+          DO_WEBSITE: ${{ needs.changes.outputs.website }}
+          DO_APP: ${{ needs.changes.outputs.app }}
+          DO_DEPLOY: ${{ needs.changes.outputs.deploy }}
+          DO_DEPS: ${{ needs.changes.outputs.deps }}
         run: |
+          set -euo pipefail
           RSYNC_SSH="ssh -i $HOME/.ssh/deploy_key -p ${PORT} -o StrictHostKeyChecking=accept-new"
-          # Ensure remote dir exists
           $RSYNC_SSH "${USER}@${HOST}" "mkdir -p ${APP_DIR}"
-          rsync -az --delete \
-            --exclude '.git/' \
-            --exclude '.env' \
-            --exclude '.env.*' \
-            --exclude 'node_modules/' \
-            --exclude '**/node_modules/' \
-            --exclude 'office/.next-dev/' \
-            --exclude 'office/.next/' \
-            --exclude 'api/data/' \
-            --exclude 'app/assets/chat/uploads/' \
-            --exclude 'app/assets/billing/proofs/' \
-            --exclude 'app/assets/learn/uploads/' \
-            --exclude '.DS_Store' \
-            --exclude 'agent-transcripts/' \
-            --exclude 'design/' \
-            -e "$RSYNC_SSH" \
-            ./ "${USER}@${HOST}:${APP_DIR}/"
+          rsync_dir() {
+            local src="$1" dest="$2"
+            echo "rsync $src -> $dest"
+            rsync -az --delete \
+              --exclude 'node_modules/' \
+              --exclude '.next-dev/' \
+              --exclude '.next/' \
+              --exclude 'data/' \
+              --exclude 'assets/chat/uploads/' \
+              --exclude 'assets/billing/proofs/' \
+              --exclude 'assets/learn/uploads/' \
+              -e "$RSYNC_SSH" \
+              "$src" "${USER}@${HOST}:${dest}"
+          }
 
-      - name: Remote install + reload
+          if [ "$DO_DEPS" = "true" ]; then
+            rsync -az -e "$RSYNC_SSH" \
+              package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc \
+              "${USER}@${HOST}:${APP_DIR}/" || true
+            rsync_dir packages/ "${APP_DIR}/packages/"
+          fi
+          if [ "$DO_API" = "true" ]; then
+            rsync_dir api/ "${APP_DIR}/api/"
+            rsync_dir packages/ "${APP_DIR}/packages/"
+          fi
+          if [ "$DO_OFFICE" = "true" ]; then
+            rsync_dir office/ "${APP_DIR}/office/"
+            rsync_dir packages/ "${APP_DIR}/packages/"
+          fi
+          if [ "$DO_WEBSITE" = "true" ]; then
+            rsync_dir website/dist/ "${APP_DIR}/website/dist/"
+          fi
+          if [ "$DO_APP" = "true" ]; then
+            rsync_dir app/dist/ "${APP_DIR}/app/dist/"
+            # assets may be referenced from API static; keep app package.json for tooling
+            rsync -az -e "$RSYNC_SSH" app/package.json "${USER}@${HOST}:${APP_DIR}/app/package.json"
+          fi
+          if [ "$DO_DEPLOY" = "true" ]; then
+            rsync_dir deploy/ "${APP_DIR}/deploy/"
+          fi
+
+      - name: Remote install + selective reload
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -97,4 +215,11 @@ jobs:
           script: |
             set -euo pipefail
             chmod +x /opt/britbee/deploy/remote-release.sh
-            APP_DIR="/opt/britbee" bash /opt/britbee/deploy/remote-release.sh
+            APP_DIR="/opt/britbee" \
+              DEPLOY_API="${{ needs.changes.outputs.api }}" \
+              DEPLOY_OFFICE="${{ needs.changes.outputs.office }}" \
+              DEPLOY_WEBSITE="${{ needs.changes.outputs.website }}" \
+              DEPLOY_APP="${{ needs.changes.outputs.app }}" \
+              DEPLOY_NGINX="${{ needs.changes.outputs.deploy }}" \
+              DEPLOY_DEPS="${{ needs.changes.outputs.deps }}" \
+              bash /opt/britbee/deploy/remote-release.sh

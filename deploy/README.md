@@ -63,8 +63,14 @@ Default hosts:
 | `EXPO_PUBLIC_API_URL` | `http://api.britbee.buzz` |
 | `NEXT_PUBLIC_API_URL` | `http://api.britbee.buzz` |
 
-3. Push to `master` (or run **Deploy VPS** → workflow_dispatch).
-4. Pipeline: **build in GitHub Actions** → rsync to VPS (keeps `.env`) → `deploy/remote-release.sh` (pnpm install + nginx + pm2 reload).
+3. Push to `master` (or run **Deploy VPS** → workflow_dispatch for a full release).
+4. Pipeline is **path-aware**:
+   - `website/**` → build + rsync `website/dist` (no PM2)
+   - `app/**` → Expo export + rsync `app/dist` (no PM2)
+   - `api/**` → rsync api + reload **britbee-api** only
+   - `office/**` → build + rsync office + reload **britbee-office** only
+   - `packages/**` or lockfile → api + office + app (+ pnpm install)
+   - `deploy/**` → nginx/pm2 scripts (nginx reload if conf changed)
 
 AIC port map: `britbee.buzz→80`, `app.britbee.buzz→8080`, `api.britbee.buzz→3001`, `office.britbee.buzz→3003`.
 
