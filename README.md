@@ -11,10 +11,10 @@ Kids learn in the app. Parents guide from the **in-app parent shell**. Mentors r
 
 | Layer | What it is | Stack | Port / surface |
 |-------|------------|-------|----------------|
-| 📱 **Kids + Parent App** | Daily practice, quests, chat, live class join + parent PIN shell | **Expo 54** · **React Native** · **React 19** · **expo-router** | Expo Go / iOS / Android / Web (`app.britbee.app`) |
-| 🌐 **Marketing website** | Public beta / waitlist | **Vite** · **React** | `britbee.app` |
-| 🧭 **Office** | Mentor cockpit — learners, classes, billing, activities, roster | **Next.js 15** · **React 19** · **Lucide** | `office.britbee.app` · `:3003` |
-| 🔌 **API** | Auth, progress, speech, notify + Expo Push, billing, guide tools | **Node 20+** · **Express** · **TypeScript** · **Zod** | `api.britbee.app` · `:3001` |
+| 📱 **Kids + Parent App** | Daily practice, quests, chat, live class join + parent PIN shell | **Expo 54** · **React Native** · **React 19** · **expo-router** | Expo Go / iOS / Android / Web (`app.britbee.buzz` → **:8080**) |
+| 🌐 **Marketing website** | Public beta / waitlist | **Vite** · **React** | `britbee.buzz` → **:80** |
+| 🧭 **Office** | Mentor cockpit — learners, classes, billing, activities, roster | **Next.js 15** · **React 19** · **Lucide** | `office.britbee.buzz` → **:3003** |
+| 🔌 **API** | Auth, progress, speech, notify + Expo Push, billing, guide tools | **Node 20+** · **Express** · **TypeScript** · **Zod** | `api.britbee.buzz` → **:3001** |
 | 📦 **Shared** | Contracts + SEO config shared across apps | `@britbee/shared` · `@britbee/config` · **Zod** | workspace packages |
 
 ```
@@ -87,7 +87,7 @@ Kids learn in the app. Parents guide from the **in-app parent shell**. Mentors r
 | `./app` | 📱 | Expo kids app **+** in-app parent shell |
 | `./office` | 🧭 | Next.js mentor backoffice |
 | `./website` | 🌐 | Public marketing / beta waitlist (Vite) |
-| `./deploy` | 🚀 | Beta host docs — preferred PM2 + Nginx; optional Docker |
+| `./deploy` | 🚀 | VPS bootstrap, Nginx/PM2, path-aware release scripts |
 | `./packages` | 📦 | Shared Zod types + brand/SEO config |
 | `./design` | 🎨 | UI mockup references |
 
@@ -283,109 +283,207 @@ Families share invite codes; mentors see every join in Office. Successful claims
 
 ---
 
-## 🚀 Beta production hosting
+## 🚀 Production hosting (AIC Cloud)
 
-Private beta runs on a **direct VM** (not Kubernetes). Full notes: [`deploy/README.md`](./deploy/README.md).
+Private beta runs on a **single Ubuntu VPS** (PM2 + Nginx) — not Kubernetes. Host-only notes also live in [`deploy/`](./deploy/).
+
+### Stack
 
 | Layer | Provider | Role |
 |-------|----------|------|
-| **Compute** | [AIC Cloud](https://aiccloud.in/) Ubuntu VPS (e.g. Essential 1 GB) | `pnpm` + **PM2** (API + Office) + **Nginx** (TLS, static `website/`, reverse proxy) |
-| **Database** | [HeavenCloud MongoDB · Mumbai](https://heavencloud.in/service/database/india) | Managed Mongo — set `MEMORY_DB=0` and `MONGODB_URI` |
-| **Object storage** | [AceCloud S3-compatible](https://acecloud.ai/cloud/storage/object/) | Billing proofs, chat voice, learn uploads (off VPS disk) |
+| **Compute** | [AIC Cloud](https://aiccloud.in/) Ubuntu VPS | Node 20 · **pnpm** · **PM2** (API + Office) · **Nginx** (lander `:80`, Expo web `:8080`) |
+| **Database** | [HeavenCloud MongoDB · Mumbai](https://heavencloud.in/service/database/india) | Prod: `MEMORY_DB=0` + `MONGODB_URI` (beta may use `MEMORY_DB=1` file DB) |
+| **Object storage** | [AceCloud S3-compatible](https://acecloud.ai/cloud/storage/object/) | Proofs / chat / learn uploads (off VPS disk when wired) |
 | **Email** | [Zoho ZeptoMail](https://www.zoho.com/zeptomail/) | Parental transactional mail |
 | **OTP** | Hanu OTP | Production SMS |
-| **Domains** | Yours (default `britbee.app` / `app.` / `api.` / `office.`) | DNS A records → AIC Cloud VPS IP |
-| **CI/CD** | GitHub Actions + Expo EAS | Website · Office · API · Expo web on VPS; Android via EAS |
+| **CI/CD** | GitHub Actions + Expo EAS | Path-aware web deploy; Android via EAS |
 
-**Preferred deploy (PM2):** clone on the VPS → `pnpm install` → build website/office → `pm2 start` API + Office → Nginx for HTTPS and static site.
+BritBee public URLs are **your** domains — not `aiccloud.in` / `heavencloud.in` / `acecloud.ai`.
 
-**Optional:** Docker Compose lives under `deploy/` if you want containers later (`pnpm beta:up`).
+### Live domains & ports (map in AIC panel)
 
-```bash
-cp deploy/env.production.example .env.production   # hosts, JWT, HeavenCloud URI, AceCloud keys, ZeptoMail
+| Domain | Surface | VM port | Process |
+|--------|---------|---------|---------|
+| `britbee.buzz` | Marketing lander | **80** | Nginx → `/opt/britbee/website/dist` |
+| `app.britbee.buzz` | Kids + parent **web app** | **8080** | Nginx → `/opt/britbee/app/dist` |
+| `api.britbee.buzz` | API | **3001** | PM2 `britbee-api` (`tsx`) |
+| `office.britbee.buzz` | Backoffice | **3003** | PM2 `britbee-office` (`next start`) |
+
+Nginx: [`deploy/nginx-britbee-buzz.conf`](./deploy/nginx-britbee-buzz.conf) · PM2: [`deploy/pm2.ecosystem.json`](./deploy/pm2.ecosystem.json)
+
+```
+                    ┌──────────────────────────────────────────┐
+                    │         AIC Cloud edge (domain → port)   │
+                    └───────────────┬──────────────────────────┘
+                                    │
+         ┌──────────────┬───────────┼───────────┬──────────────┐
+         ▼              ▼           ▼           ▼
+    :80 lander     :8080 web    :3001 API   :3003 Office
+    Nginx static   Nginx static  PM2         PM2
+         │              │           │           │
+         └──────────────┴───────────┴───────────┘
+                          /opt/britbee
+                          .env (CD never overwrites)
 ```
 
-BritBee public URLs are **your** domains — not `aiccloud.in` / `heavencloud.in` / `acecloud.ai` (those are providers).
+### Server layout
+
+| Path | Purpose |
+|------|---------|
+| `/opt/britbee` | Release root (rsync target) |
+| `/opt/britbee/.env` | Secrets + public API URLs (**preserved** by CD) |
+| `/opt/britbee/website/dist` | Lander static |
+| `/opt/britbee/app/dist` | Expo web static |
+| `/opt/britbee/office/.next-build` | Next production build |
+| `/opt/britbee/api` | Express API |
+
+### First-time VPS (manual)
+
+1. Provision AIC VPS; open SSH; map domains → ports in the table above.
+2. Install Node 20, pnpm 9, nginx, pm2 ([`deploy/bootstrap-vps.sh`](./deploy/bootstrap-vps.sh)).
+3. Place code at `/opt/britbee` and create `.env` from [`deploy/env.production.example`](./deploy/env.production.example):
+
+```env
+MEMORY_DB=1
+JWT_SECRET=long-random
+API_PORT=3001
+EXPO_PUBLIC_API_URL=http://api.britbee.buzz
+NEXT_PUBLIC_API_URL=http://api.britbee.buzz
+MAIL_APP_URL=http://britbee.buzz
+```
+
+4. Start processes:
+
+```bash
+pm2 start /opt/britbee/deploy/pm2.ecosystem.json && pm2 save && pm2 startup
+cp /opt/britbee/deploy/nginx-britbee-buzz.conf /etc/nginx/sites-available/britbee
+ln -sfn /etc/nginx/sites-available/britbee /etc/nginx/sites-enabled/britbee
+nginx -t && systemctl reload nginx
+```
+
+5. Enable GitHub Actions secrets/vars (below) so every `master` push deploys.
+
+Optional: Docker under `deploy/` (`pnpm beta:up`) — not the primary path.
 
 ---
 
-## 🔁 CI/CD
+## 🔁 CI/CD architecture
 
-GitHub Actions + EAS. Workflows live under [`.github/workflows/`](./.github/workflows/). Details: [`deploy/README.md`](./deploy/README.md#cicd).
+Workflows: [`.github/workflows/`](./.github/workflows/).
 
-| Surface | Path | CI (PR / push) | CD |
-|---------|------|----------------|-----|
-| 🌐 **Marketing website** | `website/` | Build Vite (`ci.yml`) | SSH → build → Nginx static (`deploy-vps.yml`) |
-| 🧭 **Backoffice (Office)** | `office/` | `next build` (`ci.yml`) | SSH → build → **PM2** `britbee-office` (`deploy-vps.yml`) |
-| 🔌 **API** | `api/` | `tsc --noEmit` (`ci.yml`) | SSH → **PM2** `britbee-api` reload (`deploy-vps.yml`) |
-| 💻 **Web app** (kids + parent) | `app/` | `expo export --platform web` (`ci.yml`) | SSH → export → Nginx `app.` host (`deploy-vps.yml`) |
-| 📱 **Android app** | `app/` + `eas.json` | — | **EAS Build** (`eas-android.yml`) — manual or `android-v*` tags |
+| Workflow | File | When | What |
+|----------|------|------|------|
+| **CI** | `ci.yml` | PR + push | Path-filtered typecheck/build |
+| **Deploy VPS** | `deploy-vps.yml` | Push to `master`/`main` + manual | Path-aware build → rsync → selective PM2/Nginx |
+| **EAS Android** | `eas-android.yml` | Manual / tag `android-v*` | Native Android via Expo EAS |
 
-### Pipeline diagram
+### End-to-end flow
 
 ```
-PR / push to master
+Developer pushes to master
         │
-        ▼
-┌───────────────────┐     path filters      ┌────────────────────┐
-│  CI (ci.yml)      │ ───────────────────▶  │ website · office   │
-│  pnpm install     │                       │ api · expo web     │
-└───────────────────┘                       └────────────────────┘
-        │
-        │ (master only + VPS_DEPLOY_ENABLED)
-        ▼
-┌───────────────────┐      SSH       ┌─────────────────────────────┐
-│ Deploy VPS        │ ─────────────▶ │ AIC Cloud · git pull ·      │
-│ deploy-vps.yml    │                │ build · pm2 reload · nginx  │
-└───────────────────┘                └─────────────────────────────┘
-
-workflow_dispatch / tag android-v*
-        │
-        ▼
-┌───────────────────┐     EAS cloud    ┌─────────────────────────────┐
-│ EAS Android       │ ───────────────▶ │ preview APK / production    │
-│ eas-android.yml   │                  │ AAB · Play / internal       │
-└───────────────────┘                  └─────────────────────────────┘
+        ├──────────────────────────────┐
+        ▼                              ▼
+┌───────────────────┐        ┌─────────────────────┐
+│ CI (ci.yml)       │        │ Deploy VPS          │
+│ path filters      │        │ if VPS_DEPLOY_ENABLED│
+│ tsc / next / vite │        │ path filters        │
+└───────────────────┘        └──────────┬──────────┘
+                                        │
+                         only changed surfaces
+                                        │
+        ┌───────────────────────────────┼───────────────────────────────┐
+        ▼                               ▼                               ▼
+ Build in GitHub Actions      rsync to /opt/britbee         remote-release.sh
+ (not on 1GB VPS)             (.env never overwritten)      pnpm? nginx? pm2?
+        │                               │                               │
+        └───────────────────────────────┴───────────────────────────────┘
+                                        │
+                              Live britbee.buzz stack
 ```
 
-### GitHub setup (once)
+Android is **separate** (EAS) — not part of every web/API push.
 
-**Actions secrets**
+### Path-aware deploy matrix
 
-| Secret | Used by |
+| Paths changed | Build in Actions | Rsync | Live reload |
+|---------------|------------------|-------|-------------|
+| `website/**` | Vite | `website/dist` | Static only (**no** PM2) |
+| `app/**` | `expo export --web` | `app/dist` | Nginx `:8080` only (**no** PM2) |
+| `api/**` | — (tsx source) | `api/` + `packages/` | **PM2 `britbee-api` only** + `/health` |
+| `office/**` | `next build` | `office/` + `.next-build` | **PM2 `britbee-office` only** |
+| `packages/**`, lockfile, root `package.json` | office + app | packages + dependents | API + Office + app (+ `pnpm install`) |
+| `deploy/**`, `deploy-vps.yml` | — | `deploy/` | Nginx conf if needed |
+
+**Full release:** Actions → **Deploy VPS** → Run workflow with `force_all`.
+
+On-box script: [`deploy/remote-release.sh`](./deploy/remote-release.sh).
+
+### Why build in GitHub Actions?
+
+AIC Essential is ~**1 GB RAM**. Compiling Next/Expo on the VPS OOMs easily. CD therefore builds lander / Office / Expo web on runners, rsyncs artifacts, and only runs `pnpm install` + selective `pm2 reload` on the box.
+
+### Downtime expectations
+
+| Surface | On deploy |
+|---------|-----------|
+| Lander / Expo web | Near-zero (static swap) |
+| API / Office | Brief blip on `pm2 reload` (seconds) |
+| Failed `/health` | Deploy job fails — check Actions + `pm2 logs` |
+
+Not multi-node HA. Fine for beta.
+
+### GitHub Secrets & Variables
+
+**Secrets**
+
+| Secret | Example |
 |--------|---------|
-| `VPS_HOST` · `VPS_USER` · `VPS_SSH_KEY` | VPS deploy |
-| `VPS_PORT` | Optional (default 22 in runner if unset — set explicitly) |
-| `EXPO_TOKEN` | EAS Android ([expo.dev](https://expo.dev) access token) |
+| `VPS_HOST` | VPS public IP |
+| `VPS_USER` | `root` |
+| `VPS_PORT` | SSH port (e.g. `20006`) |
+| `VPS_SSH_KEY` | Deploy private key (PEM) |
+| `EXPO_TOKEN` | Expo token (Android only) |
 
-**Actions variables**
+**Variables**
 
-| Variable | Purpose |
+| Variable | Example |
 |----------|---------|
-| `VPS_DEPLOY_ENABLED=true` | Turns on auto-deploy on push to master |
+| `VPS_DEPLOY_ENABLED` | `true` |
 | `VPS_APP_DIR` | `/opt/britbee` |
-| `EXPO_PUBLIC_API_URL` / `NEXT_PUBLIC_API_URL` | e.g. `http://api.britbee.buzz` |
+| `EXPO_PUBLIC_API_URL` | `http://api.britbee.buzz` |
+| `NEXT_PUBLIC_API_URL` | `http://api.britbee.buzz` |
 
-Live CD is **path-aware**: only build/rsync/reload surfaces that changed (`app/` → Expo web only; `api/` → API pm2 reload; shared `packages/` → api+office+app). Manual **Deploy VPS** with force_all does a full release.
+Without `VPS_DEPLOY_ENABLED=true`, pushes only run CI.
 
+### Client API URLs
 
-### Default public hosts
+Office and Expo web bake API URLs at **build** time from the variables above. Changing the API host requires rebuilding those clients (touch `office/` / `app/` or `force_all`).
 
-| Host | Serves |
-|------|--------|
-| `britbee.app` | Marketing (`website/dist`) |
-| `app.britbee.app` | Expo web (`app/dist`) |
-| `api.britbee.app` | API :3001 |
-| `office.britbee.app` | Office :3003 |
+### Android (EAS)
 
-Nginx sketch: [`deploy/nginx.example.conf`](./deploy/nginx.example.conf). PM2: [`deploy/pm2.ecosystem.cjs`](./deploy/pm2.ecosystem.cjs).
+1. Set `EXPO_TOKEN`.
+2. Actions → **EAS Android** → `preview` or `production`.
+3. Or tag: `git tag android-v1.0.0 && git push --tags`.
+4. Profiles in `app/eas.json`; FCM via `eas credentials` (Push section below).
 
-### Android release tips
+### Operator cheat sheet
 
-1. `eas login` / set `EXPO_TOKEN` on GitHub.
-2. Run **EAS Android** → profile `preview` (internal APK) or `production`.
-3. Or tag: `git tag android-v1.0.0 && git push --tags` → production profile.
-4. FCM credentials via `eas credentials` (see Push section below).
+```bash
+# https://github.com/Britbee-Education/mono-repo/actions
+
+# On the VPS
+pm2 list
+pm2 logs britbee-api --lines 50
+curl -sS http://127.0.0.1:3001/health
+curl -sS -H 'Host: britbee.buzz' http://127.0.0.1/
+curl -sS -H 'Host: app.britbee.buzz' http://127.0.0.1:8080/
+
+# Force full CD
+gh workflow run deploy-vps.yml -R Britbee-Education/mono-repo
+```
+
+More host-only detail: [`deploy/README.md`](./deploy/README.md).
 
 ---
 
