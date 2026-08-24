@@ -1,5 +1,7 @@
 "use client";
 
+import { MascotMark } from "@/components/MascotMark";
+
 export default function Error({
   error,
   reset,
@@ -10,10 +12,12 @@ export default function Error({
   return (
     <div className="page" style={{ minHeight: "70vh", display: "grid", placeItems: "center" }}>
       <div className="card" style={{ maxWidth: 560, textAlign: "center" }}>
-        <div style={{ fontSize: 56, marginBottom: 8 }}>🐝</div>
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 8 }}>
+          <MascotMark size={72} />
+        </div>
         <h1 className="hello" style={{ marginBottom: 6 }}>Oops, hive hiccup</h1>
         <p className="lead">
-          Something went wrong here. Our bee is already fixing it. Try again and continue helping learners.
+          Something went wrong here. Try again and continue helping learners.
         </p>
         <p className="hint" style={{ wordBreak: "break-word" }}>
           {error.message || "Unexpected error"}

@@ -13,10 +13,11 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { useProgress, type RewardClaim } from "@/context/ProgressContext";
-import { DAILY_QUESTS, HELLO_PACK_KEY, QUESTS } from "@/lib/quests";
+import { DAILY_QUESTS, HARVEST_PACK_KEY, HELLO_PACK_KEY, QUESTS } from "@/lib/quests";
 import { playSfx } from "@/lib/sfx";
 import { colors, fonts } from "@/constants/theme";
-import { planetsDicebearPngUrl, sproutsDicebearPngUrl } from "@/lib/dicebear";
+import { clayWormsDicebearPngUrl, sproutsDicebearPngUrl } from "@/lib/dicebear";
+import { kidPlantMeta, kidWormMeta } from "@/lib/kidCopy";
 import { NextUnlockLabel } from "@/components/game/NextUnlockLabel";
 
 const SPARKS = [
@@ -201,7 +202,11 @@ export function ClaimHost() {
         )}
         {claim.kind === "pack" ? (
           <Text style={styles.today}>
-            {claim.packKey === HELLO_PACK_KEY ? "Daily Sprouts opened today" : "Class Bonus opened today"}
+            {claim.packKey === HELLO_PACK_KEY
+              ? "New plant for your bag!"
+              : claim.packKey === HARVEST_PACK_KEY
+                ? "Buzz from your garden is ready!"
+                : "New helper worm for your bag!"}
           </Text>
         ) : (
           <>
@@ -238,9 +243,10 @@ export function ClaimHost() {
               resizeMode="contain"
             />
             <View style={{ flex: 1 }}>
-              <Text style={styles.sproutTitle}>{claim.sproutReward.label} unlocked!</Text>
+              <Text style={styles.sproutTitle}>{claim.sproutReward.label} is in your bag!</Text>
               <Text style={styles.sproutSub}>
-                {claim.sproutReward.rarity}
+                {kidPlantMeta({ rarity: claim.sproutReward.rarity, seedPower: claim.sproutReward.seedPower })}
+                {" · put it in My Garden"}
               </Text>
             </View>
           </View>
@@ -248,14 +254,15 @@ export function ClaimHost() {
         {claim.kind === "pack" && claim.planetReward ? (
           <View style={styles.sproutCard}>
             <Image
-              source={{ uri: planetsDicebearPngUrl({ seed: claim.planetReward.id, size: 88 }) }}
+              source={{ uri: clayWormsDicebearPngUrl({ seed: claim.planetReward.id, size: 88 }) }}
               style={styles.sproutImg}
               resizeMode="contain"
             />
             <View style={{ flex: 1 }}>
-              <Text style={styles.sproutTitle}>{claim.planetReward.label} unlocked!</Text>
+              <Text style={styles.sproutTitle}>{claim.planetReward.label} is in your bag!</Text>
               <Text style={styles.sproutSub}>
-                {claim.planetReward.rarity}
+                {kidWormMeta({ rarity: claim.planetReward.rarity, boostPct: claim.planetReward.boostPct })}
+                {" · add it to a plant in My Garden"}
               </Text>
             </View>
           </View>

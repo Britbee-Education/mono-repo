@@ -19,7 +19,6 @@ import { RichChatBubble } from "@/components/social/RichChatBubble";
 import { VibeOverlay } from "@/components/social/VibeOverlay";
 import { useAuth } from "@/context/AuthContext";
 import { useHive } from "@/context/HiveContext";
-import { useProgress } from "@/context/ProgressContext";
 import { useSocial, isPendingChatId } from "@/context/SocialContext";
 import { useLayout } from "@/lib/layout";
 import { useKeyboardHeight } from "@/lib/useKeyboardHeight";
@@ -156,7 +155,6 @@ export default function SocialScreen() {
   const { user } = useAuth();
   const { padX } = useLayout();
   const insets = useSafeAreaInsets();
-  const { grantHelloPack } = useProgress();
   const { hive, refresh: refreshHive, dare } = useHive();
   const { social, mentorChat, refresh, sendChat, sendChatPayload, sendMentorChat, sendMentorChatPayload, sendVibe, startRoom, joinRoom, loadRoom, setChatLive } = useSocial();
   const [draft, setDraft] = useState("");
@@ -179,12 +177,11 @@ export default function SocialScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      grantHelloPack();
       void refresh();
       void refreshHive();
       setChatLive(chatLiveOn);
       return () => setChatLive(false);
-    }, [grantHelloPack, refresh, refreshHive, setChatLive, chatLiveOn])
+    }, [refresh, refreshHive, setChatLive, chatLiveOn])
   );
 
   useEffect(() => {

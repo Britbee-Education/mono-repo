@@ -335,7 +335,15 @@ export function HiveAvatar({
           }}
         />
         {maya || emoji ? (
-          <Text style={{ fontSize: size * 0.48 }}>{emoji || "🐝"}</Text>
+          !emoji || emoji === "🐝" ? (
+            <Image
+              source={require("../../assets/bee.png")}
+              style={{ width: inner, height: Math.round(inner * (155 / 232)) }}
+              resizeMode="contain"
+            />
+          ) : (
+            <Text style={{ fontSize: size * 0.48 }}>{emoji}</Text>
+          )
         ) : showBee ? (
           <>
             <Image

@@ -120,8 +120,29 @@ export function sproutsDicebearPngUrl({ seed, size }: { seed: string; size: numb
   return `https://api.dicebear.com/10.x/sprouts/png?seed=${encodeURIComponent(seed)}&size=${px}`;
 }
 
-export function planetsDicebearPngUrl({ seed, size }: { seed: string; size: number }) {
+/**
+ * Class-bonus garden worms — DiceBear clay style
+ * (@see https://www.dicebear.com/playground/?style=clay)
+ * Soft clay “slug” bodies that help sprouts grow in the garden.
+ */
+export function clayWormsDicebearPngUrl({ seed, size }: { seed: string; size: number }) {
   const px = clamp(Math.round(size), 24, 1200);
-  return `https://api.dicebear.com/10.x/planets/png?seed=${encodeURIComponent(seed)}&size=${px}`;
+  // Clay “slug” bodies read as garden worms; seed drives color/face variety.
+  // @see https://www.dicebear.com/playground/?style=clay
+  const params = new URLSearchParams({
+    seed,
+    size: String(px),
+    bodyVariant: "slug",
+    topVariant: "antenna",
+    eyesVariant: "happy",
+    mouthVariant: "smile",
+    backgroundColor: "f5efe4",
+  });
+  return `https://api.dicebear.com/10.x/clay/png?${params.toString()}`;
+}
+
+/** @deprecated Use clayWormsDicebearPngUrl — planets were replaced by garden worms. */
+export function planetsDicebearPngUrl(opts: { seed: string; size: number }) {
+  return clayWormsDicebearPngUrl(opts);
 }
 

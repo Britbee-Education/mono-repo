@@ -1,6 +1,6 @@
 import { todayIst } from "@/lib/day";
 import { weekKey } from "@/data/phonics";
-import type { QuestId } from "@/lib/quests";
+import { YARD_SLOT_COUNT, type QuestId } from "@/lib/quests";
 
 export type RemoteSnapshot = {
   points?: number;
@@ -14,6 +14,8 @@ export type RemoteSnapshot = {
   lastActiveDay?: string;
   sprouts?: unknown[];
   planets?: unknown[];
+  yards?: { index?: number; sproutUid?: string; wormUids?: string[] }[];
+  harvestDay?: string;
   packDay?: string;
   packsToday?: string[];
   pendingClaim?: unknown;
@@ -31,13 +33,36 @@ function unionStrings(a: string[] = [], b: string[] = []) {
   return Array.from(new Set([...a, ...b]));
 }
 
-function uniqCollectibles<T extends { id?: string; seed?: string }>(a: T[] = [], b: T[] = []) {
+function uniqCollectibles<T extends { uid?: string; id?: string; claimedAt?: string; seed?: string }>(
+  a: T[] = [],
+  b: T[] = []
+) {
   const map = new Map<string, T>();
   for (const row of [...a, ...b]) {
-    const key = String(row.id || row.seed || JSON.stringify(row));
+    const key = String(row.uid || `${row.id || row.seed || ""}|${row.claimedAt || ""}|${JSON.stringify(row)}`);
     map.set(key, row);
   }
   return Array.from(map.values());
+}
+
+function mergeYards(
+  local?: { index?: number; sproutUid?: string; wormUids?: string[] }[] | null,
+  remote?: { index?: number; sproutUid?: string; wormUids?: string[] }[] | null
+) {
+  const slots = Array.from({ length: YARD_SLOT_COUNT }, (_, index) => {
+    const l = (local || []).find((y) => y.index === index);
+    const r = (remote || []).find((y) => y.index === index);
+    const localPlanted = Boolean(l?.sproutUid);
+    const remotePlanted = Boolean(r?.sproutUid);
+    // Prefer non-empty plantings; if both planted, keep local.
+    const pick = localPlanted ? l : remotePlanted ? r : l || r;
+    return {
+      index,
+      sproutUid: pick?.sproutUid,
+      wormUids: Array.isArray(pick?.wormUids) ? pick!.wormUids!.filter(Boolean) : [],
+    };
+  });
+  return slots;
 }
 
 export function progressStorageKey(userId: string, childIndex: number) {
@@ -74,13 +99,21 @@ export function mergeProgressState(local: Record<string, unknown>, remote: Remot
     storyCleared: Boolean(local.storyCleared || remote.storyEver),
     lastActiveDay: localDay >= remoteDay ? localDay || remoteDay : remoteDay,
     sprouts: uniqCollectibles(
-      Array.isArray(local.sprouts) ? (local.sprouts as { id?: string; seed?: string }[]) : [],
-      (remote.sprouts as { id?: string; seed?: string }[]) || []
+      Array.isArray(local.sprouts) ? (local.sprouts as { uid?: string; id?: string; claimedAt?: string; seed?: string }[]) : [],
+      (remote.sprouts as { uid?: string; id?: string; claimedAt?: string; seed?: string }[]) || []
     ),
     planets: uniqCollectibles(
-      Array.isArray(local.planets) ? (local.planets as { id?: string; seed?: string }[]) : [],
-      (remote.planets as { id?: string; seed?: string }[]) || []
+      Array.isArray(local.planets) ? (local.planets as { uid?: string; id?: string; claimedAt?: string; seed?: string }[]) : [],
+      (remote.planets as { uid?: string; id?: string; claimedAt?: string; seed?: string }[]) || []
     ),
+    yards: mergeYards(
+      Array.isArray(local.yards) ? (local.yards as { index?: number; sproutUid?: string; wormUids?: string[] }[]) : null,
+      remote.yards || null
+    ),
+    harvestDay:
+      local.harvestDay === day || remote.harvestDay === day
+        ? day
+        : (typeof local.harvestDay === "string" ? local.harvestDay : undefined) || remote.harvestDay,
     packDay: local.packDay === day || remote.packDay === day ? day : remote.packDay || local.packDay,
     packsToday:
       local.packDay === day && remote.packDay === day

@@ -2,6 +2,7 @@ import { useCallback } from "react";
 import { View, Text, StyleSheet, ScrollView } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { ScreenDecor } from "@/components/ui/ScreenDecor";
+import { EmptyBee } from "@/components/ui/EmptyBee";
 import { HiveHonors } from "@/components/hive/HiveHonors";
 import { useHive } from "@/context/HiveContext";
 import { useProgress } from "@/context/ProgressContext";
@@ -13,14 +14,13 @@ export default function LeaderboardScreen() {
   const router = useRouter();
   const { headerTop, padX, activityMax } = useLayout();
   const { hive, refresh } = useHive();
-  const { snapshot, track, grantHelloPack } = useProgress();
+  const { snapshot, track } = useProgress();
   const next = nextQuest(snapshot);
 
   useFocusEffect(
     useCallback(() => {
       void refresh();
-      grantHelloPack();
-    }, [refresh, grantHelloPack])
+    }, [refresh])
   );
 
   function climb() {
@@ -47,10 +47,12 @@ export default function LeaderboardScreen() {
         {hive?.board?.length ? (
           <HiveHonors hive={hive} onClimb={climb} />
         ) : (
-          <View style={styles.empty}>
-            <Text style={styles.emptyTitle}>Hive is waking up</Text>
-            <Text style={styles.emptySub}>Play today’s activities and the race will fill with bees.</Text>
-          </View>
+          <EmptyBee
+            title="Hive is waking up"
+            message="Play today’s activities and the race will fill with bees."
+            size={100}
+            style={styles.empty}
+          />
         )}
       </ScrollView>
     </View>
@@ -65,10 +67,8 @@ const styles = StyleSheet.create({
   empty: {
     backgroundColor: colors.white,
     borderRadius: 18,
-    padding: 20,
     borderWidth: 1,
     borderColor: "#EEE8DC",
+    marginTop: 8,
   },
-  emptyTitle: { fontFamily: fonts.extra, color: colors.navy, fontSize: 16 },
-  emptySub: { fontFamily: fonts.medium, color: colors.ink, fontSize: 13, marginTop: 6, lineHeight: 18 },
 });

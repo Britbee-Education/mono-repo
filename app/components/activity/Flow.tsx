@@ -1,6 +1,7 @@
 import { Text, StyleSheet, View } from "react-native";
 import { PillButton } from "@/components/ui/PillButton";
 import { Card } from "@/components/ui/Card";
+import { MascotMark } from "@/components/ui/MascotMark";
 import { colors, fonts, radii } from "@/constants/theme";
 
 export function StepNext({
@@ -49,7 +50,7 @@ export function RoundDone({
 }) {
   return (
     <Card style={styles.done}>
-      <Text style={styles.bee}>🐝</Text>
+      <MascotMark size={72} />
       <Text style={styles.title}>{title}</Text>
       {sub ? <Text style={styles.sub}>{sub}</Text> : null}
       <View style={{ marginTop: 16, alignSelf: "stretch" }}>

@@ -1,8 +1,8 @@
-import { useCallback, useMemo, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, Switch, Image } from "react-native";
+import { useMemo, useState } from "react";
+import { View, Text, StyleSheet, ScrollView, Switch, Image, Share, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { useFocusEffect, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import Animated, { ZoomIn } from "react-native-reanimated";
 import { PillButton } from "@/components/ui/PillButton";
 import { ScreenDecor } from "@/components/ui/ScreenDecor";
@@ -13,11 +13,13 @@ import { useProgress } from "@/context/ProgressContext";
 import { useNotify } from "@/context/NotifyContext";
 import { useHive } from "@/context/HiveContext";
 import { useLayout } from "@/lib/layout";
+import { api } from "@/lib/api";
 import { colors, fonts, radii } from "@/constants/theme";
 import { HiveAvatar, placeLabel } from "@/components/hive/HiveAvatar";
 import { RewardRow } from "@/components/game/StatBadges";
-import { crittersDicebearPngUrl, planetsDicebearPngUrl, sproutsDicebearPngUrl } from "@/lib/dicebear";
-import { HELLO_PACK_KEY } from "@/lib/quests";
+import { clayWormsDicebearPngUrl, crittersDicebearPngUrl, sproutsDicebearPngUrl } from "@/lib/dicebear";
+import { HELLO_PACK_KEY, gardenBedsFromSprouts, wormBoostersFromCollection } from "@/lib/quests";
+import { kidPlantMeta, kidWormMeta } from "@/lib/kidCopy";
 import { NextUnlockLabel } from "@/components/game/NextUnlockLabel";
 
 /** Lighten a hex color toward white for gradient start */
@@ -47,7 +49,6 @@ export default function AccountScreen() {
     rank,
     snapshot,
     clearedSounds,
-    grantHelloPack,
     attendStreak,
     classAttendStreak,
     verbsCleared,
@@ -55,6 +56,8 @@ export default function AccountScreen() {
     sprouts,
     planets,
     packsToday,
+    walletSprouts,
+    walletWorms,
   } = useProgress();
   const { enabled: notify, setEnabled: setNotify } = useNotify();
   const { hive } = useHive();
@@ -144,41 +147,23 @@ export default function AccountScreen() {
   const selectedBadge = badgeDefs.find((b) => b.id === selectedBadgeId) || badgeDefs[0];
   const rankNow = hive ? placeLabel(hive.me.place) : "—";
 
-  const sproutItems = useMemo(() => {
-    const grouped = sprouts.reduce<Record<string, { id: string; label: string; rarity: string; count: number }>>((acc, s) => {
-      const key = s.id;
-      const prev = acc[key];
-      acc[key] = {
-        id: s.id,
-        label: s.label,
-        rarity: s.rarity,
-        count: (prev?.count || 0) + 1,
-      };
-      return acc;
-    }, {});
-    return Object.values(grouped).sort((a, b) => b.count - a.count);
-  }, [sprouts]);
+  const sproutItems = useMemo(() => gardenBedsFromSprouts(sprouts), [sprouts]);
+  const wormItems = useMemo(() => wormBoostersFromCollection(planets), [planets]);
+  const plantedSproutCount = Math.max(0, sprouts.length - walletSprouts.length);
+  const plantedWormCount = Math.max(0, planets.length - walletWorms.length);
 
-  const planetItems = useMemo(() => {
-    const grouped = planets.reduce<Record<string, { id: string; label: string; rarity: string; count: number }>>((acc, p) => {
-      const key = p.id;
-      const prev = acc[key];
-      acc[key] = {
-        id: p.id,
-        label: p.label,
-        rarity: p.rarity,
-        count: (prev?.count || 0) + 1,
-      };
-      return acc;
-    }, {});
-    return Object.values(grouped).sort((a, b) => b.count - a.count);
-  }, [planets]);
-
-  useFocusEffect(
-    useCallback(() => {
-      grantHelloPack();
-    }, [grantHelloPack])
-  );
+  async function inviteFriend() {
+    try {
+      const me = await api.referralMe();
+      await Share.share({
+        message:
+          me.shareText ||
+          `Join BritBee with my code ${me.code}! Friends, neighbours, classmates, and siblings welcome.`,
+      });
+    } catch (e) {
+      Alert.alert("Invite", e instanceof Error ? e.message : "Could not load your invite code.");
+    }
+  }
 
   return (
     <View style={styles.root}>
@@ -385,7 +370,7 @@ export default function AccountScreen() {
           <Card style={styles.collectionCard}>
             <BouncePress sound={false} onPress={() => setOpenCollection((v) => (v === "sprouts" ? null : "sprouts"))}>
               <View style={styles.collectionHead}>
-                <Text style={styles.collectionTitle}>Daily Sprouts</Text>
+                <Text style={styles.collectionTitle}>My Plants</Text>
                 <View style={styles.collectionRight}>
                   <Text style={styles.collectionCount}>{sprouts.length}</Text>
                   <Ionicons name={openCollection === "sprouts" ? "chevron-up" : "chevron-down"} size={16} color={colors.muted} />
@@ -394,16 +379,21 @@ export default function AccountScreen() {
               {packsToday.includes(HELLO_PACK_KEY) ? (
                 <NextUnlockLabel kind="sprout" style={styles.collectionSub} />
               ) : null}
+              {sprouts.length ? (
+                <Text style={styles.collectionSub}>
+                  {walletSprouts.length} ready · {plantedSproutCount} in My Garden
+                </Text>
+              ) : null}
               {sprouts.length && openCollection !== "sprouts" ? (
                 <View style={styles.collectibleRow}>
                   {sprouts.slice(-10).reverse().map((s, idx) => (
-                    <View key={`${s.id}-${s.claimedAt}-${idx}`} style={[styles.collectibleBubble, idx > 0 && styles.collectibleStacked]}>
+                    <View key={s.uid || `${s.id}-${s.claimedAt}-${idx}`} style={[styles.collectibleBubble, idx > 0 && styles.collectibleStacked]}>
                       <Image source={{ uri: sproutsDicebearPngUrl({ seed: `${s.id}|${s.claimedAt}`, size: 52 }) }} style={styles.collectibleImg} />
                     </View>
                   ))}
                 </View>
               ) : !packsToday.includes(HELLO_PACK_KEY) ? (
-                <Text style={styles.collectionSub}>Open Daily Sprouts to unlock your first sprout buddy.</Text>
+                <Text style={styles.collectionSub}>Get today’s plant. Then plant it in My Garden!</Text>
               ) : null}
             </BouncePress>
             {openCollection === "sprouts" ? (
@@ -418,12 +408,12 @@ export default function AccountScreen() {
                         <Text style={styles.collectionItemTitle}>{s.label}</Text>
                       </View>
                       <Text style={styles.collectionItemMeta}>
-                        {s.rarity} · x{s.count}
+                        {kidPlantMeta({ rarity: s.rarity, seedPower: s.seedPower ?? s.yieldBonus, count: s.count })}
                       </Text>
                     </View>
                   ))
                 ) : (
-                  <Text style={styles.collectionSub}>No sprouts yet.</Text>
+                  <Text style={styles.collectionSub}>No plants yet. Get today’s plant!</Text>
                 )}
               </View>
             ) : null}
@@ -432,47 +422,66 @@ export default function AccountScreen() {
           <Card style={styles.collectionCard}>
             <BouncePress sound={false} onPress={() => setOpenCollection((v) => (v === "planets" ? null : "planets"))}>
               <View style={styles.collectionHead}>
-                <Text style={styles.collectionTitle}>Class Bonus</Text>
+                <Text style={styles.collectionTitle}>My Helpers</Text>
                 <View style={styles.collectionRight}>
                   <Text style={styles.collectionCount}>{planets.length}</Text>
                   <Ionicons name={openCollection === "planets" ? "chevron-up" : "chevron-down"} size={16} color={colors.muted} />
                 </View>
               </View>
+              {planets.length ? (
+                <Text style={styles.collectionSub}>
+                  {walletWorms.length} ready · {plantedWormCount} helping in My Garden
+                </Text>
+              ) : null}
               {planets.length && openCollection !== "planets" ? (
                 <View style={styles.collectibleRow}>
                   {planets.slice(-10).reverse().map((p, idx) => (
-                    <View key={`${p.id}-${p.claimedAt}-${idx}`} style={[styles.collectibleBubble, styles.planetBubble, idx > 0 && styles.collectibleStacked]}>
-                      <Image source={{ uri: planetsDicebearPngUrl({ seed: `${p.id}|${p.claimedAt}`, size: 52 }) }} style={styles.collectibleImg} />
+                    <View key={p.uid || `${p.id}-${p.claimedAt}-${idx}`} style={[styles.collectibleBubble, styles.planetBubble, idx > 0 && styles.collectibleStacked]}>
+                      <Image source={{ uri: clayWormsDicebearPngUrl({ seed: `${p.id}|${p.claimedAt}`, size: 52 }) }} style={styles.collectibleImg} />
                     </View>
                   ))}
                 </View>
               ) : (
-                <Text style={styles.collectionSub}>Join classes to unlock your first electric planet buddy.</Text>
+                <Text style={styles.collectionSub}>Get helpers from class. Then add them to plants in My Garden!</Text>
               )}
             </BouncePress>
             {openCollection === "planets" ? (
               <View style={styles.collectionList}>
-                {planetItems.length ? (
-                  planetItems.map((p) => (
-                    <View key={p.id} style={styles.collectionItem}>
+                {wormItems.length ? (
+                  wormItems.map((w) => (
+                    <View key={w.id} style={styles.collectionItem}>
                       <View style={styles.collectionItemLeft}>
                         <View style={[styles.collectionItemAvatarWrap, styles.planetItemAvatarWrap]}>
-                          <Image source={{ uri: planetsDicebearPngUrl({ seed: p.id, size: 42 }) }} style={styles.collectionItemAvatar} />
+                          <Image source={{ uri: clayWormsDicebearPngUrl({ seed: w.id, size: 42 }) }} style={styles.collectionItemAvatar} />
                         </View>
-                        <Text style={styles.collectionItemTitle}>{p.label}</Text>
+                        <Text style={styles.collectionItemTitle}>{w.label}</Text>
                       </View>
                       <Text style={styles.collectionItemMeta}>
-                        {p.rarity} · x{p.count}
+                        {kidWormMeta({ rarity: w.rarity, boostPct: w.boostPct, count: w.count })}
                       </Text>
                     </View>
                   ))
                 ) : (
-                  <Text style={styles.collectionSub}>No planets yet.</Text>
+                  <Text style={styles.collectionSub}>No helpers yet. Go to a class!</Text>
                 )}
               </View>
             ) : null}
           </Card>
         </View>
+
+        <Text style={styles.section}>Invite friends</Text>
+        <BouncePress sound="tap" onPress={() => void inviteFriend()} style={styles.inviteCard}>
+          <View style={styles.inviteIcon}>
+            <Ionicons name="gift-outline" size={18} color={colors.navy} />
+          </View>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={styles.inviteTitle}>Invite a friend</Text>
+            <Text style={styles.inviteSub}>
+              Share your family code with classmates, neighbours, or siblings — earn Buzz Points together.
+            </Text>
+          </View>
+          <Ionicons name="share-outline" size={18} color={colors.navy} />
+        </BouncePress>
 
         <Text style={styles.section}>Parent Access</Text>
         <BouncePress sound={false} onPress={() => router.push("/parent")} style={styles.parentCard}>
@@ -481,7 +490,7 @@ export default function AccountScreen() {
           </View>
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={styles.parentTitle}>Parent Access</Text>
-            <Text style={styles.parentSub}>Grown-ups only. Progress, payments, plans, and parental controls.</Text>
+            <Text style={styles.parentSub}>Grown-ups only. Progress, payments, plans, referrals, and parental controls.</Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.7)" />
         </BouncePress>
@@ -841,4 +850,25 @@ const styles = StyleSheet.create({
   },
   parentTitle: { fontFamily: fonts.extra, color: colors.white, fontSize: 15 },
   parentSub: { fontFamily: fonts.medium, color: "rgba(255,255,255,0.78)", fontSize: 12, marginTop: 2 },
+  inviteCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: colors.white,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#EEF1F6",
+    padding: 14,
+    marginTop: 12,
+  },
+  inviteIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: "#FFF6D6",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  inviteTitle: { fontFamily: fonts.extra, color: colors.navy, fontSize: 15 },
+  inviteSub: { fontFamily: fonts.medium, color: colors.muted, fontSize: 12, marginTop: 2 },
 });

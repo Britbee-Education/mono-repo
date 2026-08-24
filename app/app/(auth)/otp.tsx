@@ -25,7 +25,11 @@ export default function OtpScreen() {
   async function onVerify() {
     try {
       setLoading(true);
-      const res = await verifyOtp(draft.phone, otp.trim(), { name: draft.name, purpose });
+      const res = await verifyOtp(draft.phone, otp.trim(), {
+        name: draft.name,
+        purpose,
+        referralCode: draft.referralCode.trim() || undefined,
+      });
       if (purpose === "reset") {
         if (!res.resetToken) throw new Error("Could not start password reset");
         update({ resetToken: res.resetToken });

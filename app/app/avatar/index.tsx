@@ -259,7 +259,7 @@ export default function AvatarStudioScreen() {
                       <Text style={styles.stepTxt}>{"<"}</Text>
                     </BouncePress>
                     <View style={styles.configPreview}>
-                      <Text style={styles.configPreviewTxt}>{HAT_EMOJI[look.hat] || "🐝"}</Text>
+                      <Text style={styles.configPreviewTxt}>{HAT_EMOJI[look.hat] || "🙂"}</Text>
                     </View>
                     <BouncePress
                       sound={false}

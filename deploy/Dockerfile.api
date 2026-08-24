@@ -1,0 +1,21 @@
+# BritBee API — Express + tsx (workspace packages)
+FROM node:20-bookworm-slim AS deps
+RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
+WORKDIR /app
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY api/package.json ./api/
+COPY packages/config/package.json ./packages/config/
+COPY packages/shared/package.json ./packages/shared/
+RUN pnpm install --filter @britbee/api... --frozen-lockfile
+
+FROM node:20-bookworm-slim AS runner
+RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=deps /app /app
+COPY api ./api
+COPY packages ./packages
+COPY app/assets ./app/assets
+WORKDIR /app/api
+EXPOSE 3001
+CMD ["pnpm", "start"]

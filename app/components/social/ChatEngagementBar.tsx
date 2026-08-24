@@ -12,8 +12,10 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { BouncePress } from "@/components/game/BouncePress";
+import { MascotMark } from "@/components/ui/MascotMark";
 import {
   CHAT_CHEERS,
+  cheerUsesMascot,
   type ChatCheer,
   type ChatSendPayload,
 } from "@/lib/chatEngagement";
@@ -135,7 +137,11 @@ function CheerPicker({
                 }}
                 style={styles.cheerPick}
               >
-                <Text style={styles.cheerPickEmoji}>{cheer.emoji}</Text>
+                {cheerUsesMascot(cheer.id) ? (
+                  <MascotMark size={36} />
+                ) : (
+                  <Text style={styles.cheerPickEmoji}>{cheer.emoji}</Text>
+                )}
                 <Text style={styles.cheerPickLabel}>{cheer.label}</Text>
               </Pressable>
             ))}

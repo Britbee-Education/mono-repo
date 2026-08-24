@@ -1,8 +1,9 @@
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, Image } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { BouncePress } from "@/components/game/BouncePress";
 import { HiveAvatar, placeLabel } from "@/components/hive/HiveAvatar";
+import { MascotMark } from "@/components/ui/MascotMark";
 import type { HiveBee, HivePayload } from "@/lib/api";
 import { colors, fonts } from "@/constants/theme";
 
@@ -122,7 +123,7 @@ export function HiveHonors({
             </View>
           ) : null}
           <View style={styles.chip}>
-            <Text style={styles.chipEmoji}>🐝</Text>
+            <MascotMark size={18} style={styles.chipMascot} />
             <Text style={styles.chipTxt} numberOfLines={1}>
               {hive.me.dailyDone
                 ? finishedFriends.length
@@ -228,6 +229,7 @@ const styles = StyleSheet.create({
     maxWidth: "100%",
   },
   chipEmoji: { fontSize: 12 },
+  chipMascot: { marginTop: 1 },
   chipTxt: { fontFamily: fonts.bold, color: colors.navy, fontSize: 11, flexShrink: 1 },
   catch: {
     marginTop: 10,

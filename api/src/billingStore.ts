@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { mailBillingEvent, mailPracticeReport } from "./mail/mailer";
+import { consumeCheckoutDiscount, peekCheckoutDiscount } from "./referralStore";
 
 export type PlanId = "trial" | "monthly" | "yearly";
 export type SubscriptionStatus = "trialing" | "active" | "past_due" | "cancelled" | "expired";
@@ -39,6 +40,11 @@ export type Payment = {
   reviewNote?: string;
   reviewedBy?: string;
   reviewedAt?: string;
+  /** Referral discount applied at checkout (percent). */
+  discountPct?: number;
+  discountLabel?: string;
+  /** Amount before referral discount (paise). */
+  originalAmount?: number;
   createdAt: string;
   completedAt?: string;
   failureReason?: string;
@@ -323,15 +329,19 @@ export function createCheckout(userId: string, planId: PlanId, method: PaymentMe
     throw new Error("Finish or cancel your pending payment first.");
   }
   const id = nextId(disk);
+  const discount = consumeCheckoutDiscount(userId, meta.amount);
   const payment: Payment = {
     id,
     userId,
     planId,
-    amount: meta.amount,
+    amount: discount.finalAmount,
     currency: "INR",
     status: "pending",
     method,
     orderRef: `BB${id.padStart(6, "0")}`,
+    discountPct: discount.pct || undefined,
+    discountLabel: discount.label,
+    originalAmount: discount.pct > 0 ? meta.amount : undefined,
     createdAt: new Date().toISOString(),
   };
   disk.payments.push(payment);
@@ -339,10 +349,25 @@ export function createCheckout(userId: string, planId: PlanId, method: PaymentMe
   logActivity(userId, {
     type: "payment",
     title: "Payment started",
-    detail: `${meta.label} · ${formatInr(meta.amount)} via ${method.toUpperCase()}`,
-    meta: { paymentId: payment.id, planId, method },
+    detail: discount.pct
+      ? `${meta.label} · ${formatInr(discount.finalAmount)} (${discount.label} off ${formatInr(meta.amount)}) via ${method.toUpperCase()}`
+      : `${meta.label} · ${formatInr(meta.amount)} via ${method.toUpperCase()}`,
+    meta: { paymentId: payment.id, planId, method, discountPct: discount.pct, discountSource: discount.source },
   });
   return payment;
+}
+
+export function referralDiscountPreview(userId: string, planId: PlanId) {
+  const meta = planMeta(planId);
+  const pct = peekCheckoutDiscount(userId);
+  const discountPaise = Math.round((meta.amount * pct) / 100);
+  return {
+    planId,
+    originalAmount: meta.amount,
+    discountPct: pct,
+    discountPaise,
+    finalAmount: Math.max(0, meta.amount - discountPaise),
+  };
 }
 
 function activatePlan(userId: string, planId: PlanId) {

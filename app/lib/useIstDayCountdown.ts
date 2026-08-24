@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { AppState } from "react-native";
 import { msUntilNextIstMidnight } from "@/lib/day";
 
-/** Live countdown to the next IST midnight — refreshes every 30s. */
-export function useIstDayCountdown(tickMs = 30_000) {
+/** Live countdown to the next IST midnight — ticks every second. */
+export function useIstDayCountdown(tickMs = 1_000) {
   const [ms, setMs] = useState(() => msUntilNextIstMidnight());
 
   useEffect(() => {

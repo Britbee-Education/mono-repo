@@ -90,6 +90,20 @@ export default function SignupStep1() {
             />
           </View>
 
+          <Text style={[styles.fieldLabel, { marginTop: 12 }]}>Friend’s invite code (optional)</Text>
+          <View style={styles.field}>
+            <Ionicons name="gift-outline" size={18} color={colors.navy} />
+            <TextInput
+              style={styles.input}
+              placeholder="BRITXXXX"
+              placeholderTextColor="#9CA3AF"
+              autoCapitalize="characters"
+              value={draft.referralCode}
+              onChangeText={(referralCode) => update({ referralCode })}
+              maxLength={12}
+            />
+          </View>
+
           <Pressable style={styles.terms} onPress={() => setAgreed((a) => !a)}>
             <View style={[styles.check, agreed && styles.checkOn]}>
               {agreed ? <Ionicons name="checkmark" size={14} color={colors.white} /> : null}

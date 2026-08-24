@@ -5,7 +5,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { Audio } from "expo-av";
 import * as WebBrowser from "expo-web-browser";
 import { HiveAvatar } from "@/components/hive/HiveAvatar";
-import { materialById, legacyStickerEmoji, type RichChatMessage } from "@/lib/chatEngagement";
+import { materialById, legacyStickerEmoji, legacyStickerUsesMascot, type RichChatMessage } from "@/lib/chatEngagement";
+import { MascotMark } from "@/components/ui/MascotMark";
 import { speak } from "@/lib/speech";
 import { colors, fonts } from "@/constants/theme";
 
@@ -41,7 +42,11 @@ export function RichChatBubble({
       <View style={[styles.bubble, mine && styles.bubbleMe, mentor && styles.bubbleMentor, pending && styles.pending]}>
         {!mine && name ? <Text style={[styles.name, mentor && styles.nameMentor]}>{name}</Text> : null}
         {kind === "sticker" ? (
-          <Text style={styles.sticker}>{legacyStickerEmoji(msg.stickerId || "") || msg.text || "🎨"}</Text>
+          legacyStickerUsesMascot(msg.stickerId || "") ? (
+            <MascotMark size={48} />
+          ) : (
+            <Text style={styles.sticker}>{legacyStickerEmoji(msg.stickerId || "") || msg.text || "🎨"}</Text>
+          )
         ) : kind === "material" ? (
           <MaterialCard msg={msg} mine={mine} onOpen={(href) => router.push(href as never)} />
         ) : kind === "attachment" ? (

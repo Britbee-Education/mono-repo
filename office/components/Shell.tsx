@@ -13,6 +13,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Gauge,
+  Gift,
   Home,
   LogOut,
   MessageSquare,
@@ -42,6 +43,7 @@ const WORKSPACE_LINKS: WorkspaceLink[] = [
   { href: "/dashboard/classes", label: "Classes", glyph: Video, tone: "purple" },
   { href: "/dashboard/rooms", label: "Rooms", glyph: Puzzle, tone: "green" },
   { href: "/dashboard/learners", label: "Learners", glyph: Users, tone: "blue" },
+  { href: "/dashboard/referrals", label: "Referrals", glyph: Gift, tone: "teal" },
   { href: "/dashboard/learn", label: "E-Learn", glyph: BookOpen, tone: "orange" },
   { href: "/dashboard/activities", label: "Activities", glyph: Activity, tone: "pink" },
 ];

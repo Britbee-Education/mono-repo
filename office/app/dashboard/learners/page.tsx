@@ -10,6 +10,7 @@ import { PageSkeleton } from "@/components/PageSkeleton";
 import { downloadJson } from "@/lib/dataTools";
 import { useDebouncedValue } from "@/lib/useDebounced";
 import { toast } from "@/lib/toast";
+import { InitialsMark } from "@/components/MascotMark";
 
 function last10(phone?: string) {
   const digits = String(phone || "").replace(/\D/g, "");
@@ -94,8 +95,8 @@ function LearnersContent() {
               const phone = last10(l.phone);
               return (
                 <Link key={l.id} href={`/dashboard/learners/${l.id}`} className="slot">
-                  <div className="slot-icon" style={{ background: "#FFF8E1" }}>
-                    🐝
+                  <div className="slot-icon" style={{ background: "#FFF8E1", display: "grid", placeItems: "center" }}>
+                    <InitialsMark name={childName(l)} size={28} />
                   </div>
                   <div style={{ flex: 1 }}>
                     <h3>{childName(l)}</h3>

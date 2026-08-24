@@ -94,6 +94,7 @@ export const signupSchema = z.object({
   phone: z.string().optional(),
   role: z.enum(["learner", "parent"]).default("parent"),
   child: childProfileSchema.optional(),
+  referralCode: z.string().min(4).max(16).optional(),
 });
 
 export const otpPurposeSchema = z.enum(["signup", "reset"]);
@@ -111,6 +112,7 @@ export const verifyOtpSchema = z.object({
   portal: z.enum(["mobile", "office"]).optional(),
   name: z.string().min(1).optional(),
   child: childProfileSchema.optional(),
+  referralCode: z.string().min(4).max(16).optional(),
 });
 
 export const setPasswordSchema = z.object({

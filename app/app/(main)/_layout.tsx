@@ -2,6 +2,7 @@ import { StyleSheet, View } from "react-native";
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useNotify } from "@/context/NotifyContext";
+import { useProgress } from "@/context/ProgressContext";
 import { colors, fonts, shadow } from "@/constants/theme";
 import { MainHeader } from "@/components/hive/MainHeader";
 
@@ -21,7 +22,9 @@ function TabIcon({
 
 export default function MainLayout() {
   const { unread } = useNotify();
+  const { claimBadgeCount } = useProgress();
   const badge = unread > 0 ? (unread > 9 ? "9+" : unread) : undefined;
+  const hiveBadge = claimBadgeCount > 0 ? (claimBadgeCount > 9 ? "9+" : claimBadgeCount) : undefined;
 
   return (
     <Tabs
@@ -42,6 +45,15 @@ export default function MainLayout() {
         options={{
           title: "Activities",
           tabBarIcon: ({ focused }) => <TabIcon name="sparkles" focused={focused} />,
+        }}
+      />
+      <Tabs.Screen
+        name="hive"
+        options={{
+          title: "Garden",
+          tabBarBadge: hiveBadge,
+          tabBarBadgeStyle: styles.badge,
+          tabBarIcon: ({ focused }) => <TabIcon name="leaf" focused={focused} />,
         }}
       />
       <Tabs.Screen

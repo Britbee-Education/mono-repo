@@ -3,13 +3,12 @@ import { View, Text, StyleSheet, FlatList, type ViewToken } from "react-native";
 import { useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { LearnReel } from "@/components/learn/LearnReel";
-import { useProgress } from "@/context/ProgressContext";
+import { EmptyBee } from "@/components/ui/EmptyBee";
 import { api, type LearnClip } from "@/lib/api";
 import { stopSpeaking } from "@/lib/speech";
 import { colors, fonts } from "@/constants/theme";
 
 export default function LearnScreen() {
-  const { grantHelloPack } = useProgress();
   const listRef = useRef<FlatList<LearnClip>>(null);
   const [clips, setClips] = useState<LearnClip[]>([]);
   const [seen, setSeen] = useState<string[]>([]);
@@ -34,13 +33,12 @@ export default function LearnScreen() {
   useFocusEffect(
     useCallback(() => {
       setFocused(true);
-      grantHelloPack();
       void load();
       return () => {
         setFocused(false);
         stopSpeaking();
       };
-    }, [grantHelloPack, load])
+    }, [load])
   );
 
   const onSeen = useCallback((id: string) => {
@@ -121,9 +119,11 @@ export default function LearnScreen() {
         />
       ) : (
         <View style={styles.empty}>
-          <Ionicons name="play-circle" size={42} color={colors.yellow} />
-          <Text style={styles.emptyTitle}>E-Learn is waking up</Text>
-          <Text style={styles.emptySub}>Short English bites from your mentor will land here.</Text>
+          <EmptyBee
+            title="E-Learn is waking up"
+            message="Short English bites from your mentor will land here."
+            size={110}
+          />
         </View>
       )}
       {clips.length > 1 && activeId === clips[0]?.id ? (

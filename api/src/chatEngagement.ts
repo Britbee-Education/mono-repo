@@ -29,7 +29,7 @@ export type ChatMaterialId = (typeof CHAT_MATERIAL_IDS)[number];
 export const CHAT_VIBE_IDS = ["popper", "celebrate", "clap", "fire", "heart", "bee"] as const;
 
 const STICKER_EMOJI: Record<ChatStickerId, string> = {
-  bee: "🐝",
+  bee: "",
   star: "⭐",
   party: "🎉",
   clap: "👏",

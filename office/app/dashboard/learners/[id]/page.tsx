@@ -10,6 +10,8 @@ import { activityStatLine, displayStatus, formatWhen } from "@/lib/progress";
 import { activityName, focusLabel, focusOptions } from "@/lib/focus";
 import { StatusChip } from "@/components/StatusChip";
 import { ParentBillingPanel } from "@/components/ParentBillingPanel";
+import { ParentReferralPanel } from "@/components/ParentReferralPanel";
+import { InitialsMark } from "@/components/MascotMark";
 
 function last10(phone?: string) {
   const digits = String(phone || "").replace(/\D/g, "");
@@ -102,7 +104,9 @@ export default function LearnerDetailPage() {
         ← Learners
       </Link>
       <div className="card" style={{ textAlign: "center" }}>
-        <div style={{ fontSize: 40 }}>🐝</div>
+        <div style={{ display: "flex", justifyContent: "center" }}>
+          <InitialsMark name={child} size={56} />
+        </div>
         <h1 className="hello" style={{ fontSize: 24 }}>
           {child}
         </h1>
@@ -162,6 +166,7 @@ export default function LearnerDetailPage() {
       </div>
 
       {isParent ? <ParentBillingPanel userId={learner.id} parentName={learner.name} /> : null}
+      {isParent ? <ParentReferralPanel userId={learner.id} /> : null}
 
       <h2 className="section">Activity control</h2>
       <div className="radar">

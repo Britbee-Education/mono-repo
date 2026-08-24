@@ -181,6 +181,12 @@ export function BritBeePayPanel({ payment, busy, onBusy, onSubmitted, onCancel }
       <View style={styles.amountBox}>
         <Text style={styles.amountLabel}>Amount payable</Text>
         <Text style={styles.amount}>{session.amountLabel || formatInr(payment.amount)}</Text>
+        {payment.discountPct && payment.originalAmount ? (
+          <Text style={styles.discountNote}>
+            {payment.discountLabel || `${payment.discountPct}% referral off`} · was{" "}
+            {formatInr(payment.originalAmount)}
+          </Text>
+        ) : null}
         <Text style={styles.plan}>{session.planLabel}</Text>
       </View>
 
@@ -273,6 +279,7 @@ const styles = StyleSheet.create({
   },
   amountLabel: { fontFamily: fonts.bold, color: colors.muted, fontSize: 11, letterSpacing: 0.6 },
   amount: { fontFamily: fonts.extra, color: colors.navy, fontSize: 28, marginTop: 4 },
+  discountNote: { fontFamily: fonts.medium, color: colors.listen, fontSize: 12, marginTop: 4 },
   plan: { fontFamily: fonts.medium, color: colors.ink, fontSize: 13, marginTop: 2 },
   step: { fontFamily: fonts.bold, color: colors.navy, fontSize: 13, marginTop: 12, marginBottom: 8 },
   qrCard: {

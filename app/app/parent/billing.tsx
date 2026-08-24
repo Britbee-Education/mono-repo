@@ -292,6 +292,11 @@ export default function ParentBillingScreen() {
                   </View>
                   <View style={{ alignItems: "flex-end" }}>
                     <Text style={styles.price}>{formatInr(p.amount)}</Text>
+                    {p.discountPct && p.originalAmount ? (
+                      <Text style={styles.rowMeta}>
+                        {p.discountPct}% off · was {formatInr(p.originalAmount)}
+                      </Text>
+                    ) : null}
                     <Text style={[styles.rowMeta, p.status === "succeeded" && styles.ok]}>{p.status}</Text>
                   </View>
                 </View>

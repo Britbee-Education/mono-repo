@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { Text, StyleSheet, View } from "react-native";
+import { MascotMark } from "@/components/ui/MascotMark";
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -70,7 +71,7 @@ export function CelebrationHost() {
         <Spark key={`${cheer.id}-${i}`} {...s} />
       ))}
       <Animated.View style={[styles.card, card]}>
-        <Text style={styles.bee}>🐝</Text>
+        <MascotMark size={56} />
         <Text style={styles.message}>{cheer.message}</Text>
         {cheer.points > 0 ? <Text style={styles.points}>+{cheer.points} Buzz Points</Text> : null}
       </Animated.View>

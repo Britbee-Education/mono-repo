@@ -1,4 +1,4 @@
-# 🐝 BritBee Monorepo
+# BritBee Monorepo
 
 > **Practical English for kids — built to help children learn, speak, and grow with confidence.** 🚀  
 > One codebase. Three surfaces. Infinite buzz.
@@ -18,7 +18,7 @@ Kids learn in the app. Parents guide from the **in-app parent shell**. Mentors r
 
 ```
                     ┌─────────────────────┐
-                    │   🐝 Kids + Parent   │
+                    │   Kids + Parent     │
                     │   Expo / RN App     │
                     └──────────┬──────────┘
                                │
@@ -28,10 +28,10 @@ Kids learn in the app. Parents guide from the **in-app parent shell**. Mentors r
 │ Next.js :3003│      │  Express :3001      │      │  Zod + SEO   │
 └──────────────┘      └──────────┬──────────┘      └──────────────┘
                                  │
-                    ┌────────────┴────────────┐
-                    ▼                         ▼
-           💾 Dev: JSON files        🍃 Prod-ready: MongoDB
-              MEMORY_DB=1                  MEMORY_DB=0
+                    ┌──────────────────┼──────────────────┐
+                    ▼                  ▼                  ▼
+           💾 Dev: JSON files   🍃 Prod: MongoDB    📦 Prod: Object storage
+              MEMORY_DB=1       HeavenCloud IN     AceCloud S3-compatible
 ```
 
 ---
@@ -41,8 +41,9 @@ Kids learn in the app. Parents guide from the **in-app parent shell**. Mentors r
 | Area | 🛠️ What we use | 💬 Why it rocks |
 |------|----------------|-----------------|
 | 🗂️ **Monorepo** | **pnpm** workspaces | One install, shared types, zero copy-paste chaos |
-| 🟦 **Language** | **TypeScript** everywhere | Types that travel from API → app → office |
+| 🟦 **Language** | **TypeScript** everywhere | Types that travel from API → app → office → website |
 | 📱 **Mobile** | **Expo SDK 54** + **React Native 0.81** | Ship iOS, Android & web from one codebase |
+| 🌐 **Marketing site** | **Vite** + **React** (`website/`) | Public beta / waitlist landing |
 | 🧭 **Routing (app)** | **expo-router** | File-based screens that feel native |
 | 🖥️ **Office web** | **Next.js 15** (App Router) | Fast mentor UI, SSR-ready |
 | ⚡ **UI motion** | Reanimated · Gesture Handler · Linear Gradient | Snappy, playful kid/mentor UX |
@@ -54,12 +55,15 @@ Kids learn in the app. Parents guide from the **in-app parent shell**. Mentors r
 | 👂 **STT / listen** | **Groq Whisper** (optional) | Better phonics scoring when `GROQ_API_KEY` is set |
 | 📸 **Media** | expo-av · image-picker · document-picker · **multer** | Voice, photos, files for class & chat |
 | 💳 **Billing** | **BritBee Pay** — custom UPI/GPay QR gateway, proof upload, mentor activation (`billingStore` + parent/Office UI) | Parents pay QR → UTR/screenshot → mentors activate; no Stripe/Razorpay for launch |
+| 🎁 **Referrals** | Invite codes + Buzz + plan discounts (`referralStore`, Parent Refer & earn, Office Referrals) | App ↔ Office: who referred whom, counts, checkout discounts |
 | 🔔 **Notifications** | **In-app inbox** + **Expo Push** → **FCM** / **APNs** + **Zoho ZeptoMail** | Mentors buzz kids; phone popups + parental email for login, reminders, reports & billing |
 | ☁️ **Push relay** | Expo Push HTTP API (`exp.host`) | Free tier for launch; API stores device tokens, fans out on mentor send |
 | 📧 **Email** | **Zoho ZeptoMail** (transactional REST API) | Login alerts, class/practice reminders, student reports, BritBee Pay updates to parents |
 | 🎬 **Live class** | Book / go-live / join room flow | Mentors start; kids tap Join |
 | 💾 **Database (dev)** | File-backed JSON (`api/data/…`) | Zero infra — restart-safe local hive |
-| 🍃 **Database (prod path)** | **MongoDB** via **Mongoose** | Flip `MEMORY_DB=0` → Atlas-ready |
+| 🍃 **Database (prod)** | **MongoDB** via **Mongoose** on [HeavenCloud India](https://heavencloud.in/service/database/india) | Managed Mumbai Mongo — `MEMORY_DB=0` + `MONGODB_URI` |
+| 📦 **Object storage (prod)** | [AceCloud S3-compatible](https://acecloud.ai/cloud/storage/object/) | Proofs, chat voice, learn uploads off the VPS disk |
+| 🖥️ **Compute (prod)** | [AIC Cloud](https://aiccloud.in/) Ubuntu VPS · **pnpm** · **PM2** · **Nginx** | Simple direct VM — no Kubernetes for beta |
 | 🧹 **Tooling** | ESLint · Expo Go · EAS · dotenv · CORS | Clean DX from laptop to classroom |
 
 ### 🚫 Intentionally *not* in the stack (yet)
@@ -68,7 +72,8 @@ Kids learn in the app. Parents guide from the **in-app parent shell**. Mentors r
 |---------|--------|
 | 🌐 Separate parent website | ❌ Removed — parents live in the app shell |
 | 💸 Stripe / Razorpay | ❌ Not needed for launch — BritBee Pay uses mentor GPay QR + manual verify |
-| ☁️ Prod host wiring | 🔜 Ready to plug (Atlas + your host of choice) |
+| ☸️ Kubernetes | ❌ Deferred — beta runs on one VPS with PM2 |
+| 🐳 Docker as primary deploy | ⚪ Optional in `deploy/` — preferred path is PM2 + Nginx on the VM |
 
 ---
 
@@ -79,6 +84,8 @@ Kids learn in the app. Parents guide from the **in-app parent shell**. Mentors r
 | `./api` | 🔌 | Express API — auth, speech, progress, guide, billing, notify |
 | `./app` | 📱 | Expo kids app **+** in-app parent shell |
 | `./office` | 🧭 | Next.js mentor backoffice |
+| `./website` | 🌐 | Public marketing / beta waitlist (Vite) |
+| `./deploy` | 🚀 | Beta host docs — preferred PM2 + Nginx; optional Docker |
 | `./packages` | 📦 | Shared Zod types + brand/SEO config |
 | `./design` | 🎨 | UI mockup references |
 
@@ -109,11 +116,11 @@ EXPO_PUBLIC_API_URL=http://localhost:3001
 NEXT_PUBLIC_API_URL=http://localhost:3001
 ```
 
-**Production-style Mongo** (e.g. Atlas free tier):
+**Production Mongo** ([HeavenCloud India](https://heavencloud.in/service/database/india)):
 
 ```
 MEMORY_DB=0
-MONGODB_URI=mongodb+srv://USER:PASS@cluster/britbee
+MONGODB_URI=mongodb://USER:PASS@HOST:PORT/britbee
 pnpm seed
 ```
 
@@ -159,6 +166,14 @@ pnpm dev:office
 ```
 
 Open http://localhost:3003
+
+### 4️⃣ Marketing website
+
+```bash
+pnpm dev:website
+```
+
+Open http://localhost:5173
 
 ### 🎯 One-shot office + API
 
@@ -232,6 +247,64 @@ BILLING_UPI_NAME=BritBee Mentors
 
 Amounts are stored in **paise** (INR × 100). Default plans: Hive Trial (₹0 / 7d), Monthly (₹499 / 30d), Yearly (₹4,999 / 365d).
 
+---
+
+## 🎁 Referral program (app ↔ Office)
+
+Families share invite codes; mentors see every join in Office. Successful claims award **Buzz Points** and stack **membership discounts** on BritBee Pay checkout.
+
+### Rewards (defaults)
+
+| Side | Buzz Points | Plan discount |
+|------|-------------|----------------|
+| Referrer (existing family) | +80 | +10% per join (stacks, cap 40%) |
+| Referred (new family) | +40 | 20% off first paid plan |
+
+### Flow
+
+1. Parent opens **Parent Access → Refer & earn** (or kid **Account → Invite a friend**) and shares code `BRIT…`.
+2. New family enters the code on signup (optional) or later under Refer & earn → Apply code.
+3. API `claimReferral` rewards both wallets and credits Buzz on progress snapshots.
+4. Next `POST /billing/checkout` applies `peekCheckoutDiscount` / `consumeCheckoutDiscount`.
+5. Mentors review **Office → Referrals** (leaders + full table) or the panel on a learner’s parent page.
+
+### Stack pieces
+
+| Layer | Path | Role |
+|-------|------|------|
+| Store | `api/src/referralStore.ts` | Codes, claims, wallets → `api/data/referrals.json` |
+| Parent/kid API | `api/src/routes/referral.ts` | `GET /referral/me`, `POST /referral/claim`, lookup |
+| Mentor API | `api/src/routes/guide.ts` | `GET /guide/referrals`, `GET /guide/referrals/parents/:userId` |
+| Signup | OTP verify + `referralCode` in shared schemas | Claim on new account |
+| App UI | `app/app/parent/refer.tsx`, Account invite | Share / claim / wallet |
+| Office UI | `office/app/dashboard/referrals`, `ParentReferralPanel` | Who referred whom + counts |
+
+---
+
+## 🚀 Beta production hosting
+
+Private beta runs on a **direct VM** (not Kubernetes). Full notes: [`deploy/README.md`](./deploy/README.md).
+
+| Layer | Provider | Role |
+|-------|----------|------|
+| **Compute** | [AIC Cloud](https://aiccloud.in/) Ubuntu VPS (e.g. Essential 1 GB) | `pnpm` + **PM2** (API + Office) + **Nginx** (TLS, static `website/`, reverse proxy) |
+| **Database** | [HeavenCloud MongoDB · Mumbai](https://heavencloud.in/service/database/india) | Managed Mongo — set `MEMORY_DB=0` and `MONGODB_URI` |
+| **Object storage** | [AceCloud S3-compatible](https://acecloud.ai/cloud/storage/object/) | Billing proofs, chat voice, learn uploads (off VPS disk) |
+| **Email** | [Zoho ZeptoMail](https://www.zoho.com/zeptomail/) | Parental transactional mail |
+| **OTP** | Hanu OTP | Production SMS |
+| **Domains** | Yours (default `britbee.app` / `api.` / `office.`) | DNS A records → AIC Cloud VPS IP |
+
+**Preferred deploy (PM2):** clone on the VPS → `pnpm install` → build website/office → `pm2 start` API + Office → Nginx for HTTPS and static site.
+
+**Optional:** Docker Compose lives under `deploy/` if you want containers later (`pnpm beta:up`).
+
+```bash
+cp deploy/env.production.example .env.production   # hosts, JWT, HeavenCloud URI, AceCloud keys, ZeptoMail
+```
+
+BritBee public URLs are **your** domains — not `aiccloud.in` / `heavencloud.in` / `acecloud.ai` (those are providers).
+
+---
 
 ## 📧 Zoho ZeptoMail (parental email)
 
@@ -319,4 +392,4 @@ Splash → Login → Signup / Forgot password → Activities (phonics, daily sen
 ---
 
 **Built with 💛 for curious kids and the mentors who cheer them on.**  
-*Buzz on.* 🐝
+*Buzz on.*

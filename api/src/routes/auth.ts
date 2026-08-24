@@ -32,7 +32,7 @@ authRouter.post("/signup", async (req, res) => {
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.flatten() });
   }
-  const { name, email, password, phone, role, child } = parsed.data;
+  const { name, email, password, phone, role, child, referralCode } = parsed.data;
   const existing = await users.findByEmail(email);
   if (existing) return res.status(409).json({ error: "Email already registered" });
 
@@ -48,6 +48,16 @@ authRouter.post("/signup", async (req, res) => {
       ? { children: [child], activeChildIndex: 0 }
       : undefined),
   });
+
+  if (referralCode) {
+    const { claimReferral } = await import("../referralStore");
+    claimReferral({
+      code: referralCode,
+      referredId: String(user._id),
+      referredName: name,
+      referredChild: child?.childName,
+    });
+  }
 
   return res.status(201).json({ token: signToken(user), user: toPublicUser(user) });
 });
@@ -146,7 +156,7 @@ authRouter.post("/otp/verify", async (req, res) => {
   const parsed = verifyOtpSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Phone, OTP, and purpose required" });
   const phone = normalizePhone(parsed.data.phone);
-  const { otp, portal, name, child, purpose } = parsed.data;
+  const { otp, portal, name, child, purpose, referralCode } = parsed.data;
   if (!isValidMobile(phone)) {
     return res.status(400).json({ error: "Enter a valid 10-digit Indian mobile number" });
   }
@@ -198,6 +208,15 @@ authRouter.post("/otp/verify", async (req, res) => {
 
   if (isNew) {
     mailWelcomeParent({ userId: String(user._id), name: user.name, email: (user as any).email });
+    if (referralCode) {
+      const { claimReferral } = await import("../referralStore");
+      claimReferral({
+        code: referralCode,
+        referredId: String(user._id),
+        referredName: user.name,
+        referredChild: child?.childName || (user as any).child?.childName,
+      });
+    }
   }
 
   return res.json({

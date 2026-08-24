@@ -9,19 +9,21 @@ import {
   ACTIVITY_BUZZ,
   beeRank,
   DAILY_QUESTS,
+  HARVEST_PACK_KEY,
   HELLO_PACK_KEY,
   QUESTS,
   classPackKey,
-  classPackSize,
-  helloPackSize,
+  ensureYards,
   planetRewardForClassStreak,
   questUnlocked,
-  type PlanetReward,
   sproutRewardForStreak,
+  yardGardenYield,
+  type PlanetReward,
   type SproutReward,
   type DayTrack,
   type ProgressSnapshot,
   type QuestId,
+  type YardSlot,
 } from "@/lib/quests";
 import { api } from "@/lib/api";
 import { playSfx, type SfxName } from "@/lib/sfx";
@@ -53,6 +55,8 @@ type ProgressState = {
   classAttendDay?: string;
   sprouts?: CollectedSprout[];
   planets?: CollectedPlanet[];
+  yards?: YardSlot[];
+  harvestDay?: string;
   claimWait?: RewardClaim[];
   _syncedAt?: string;
 };
@@ -79,14 +83,18 @@ export type RewardClaim = {
   nextTitle?: string;
   sproutReward?: SproutReward;
   planetReward?: PlanetReward;
+  /** Snapshot of garden seed + worm boost applied to this pack. */
+  gardenYield?: import("@/lib/quests").GardenYield;
 };
 
 export type CollectedSprout = SproutReward & {
   claimedAt: string;
+  uid: string;
 };
 
 export type CollectedPlanet = PlanetReward & {
   claimedAt: string;
+  uid: string;
 };
 
 type Ctx = {
@@ -125,6 +133,18 @@ type Ctx = {
   classAttendStreak: number;
   sprouts: CollectedSprout[];
   planets: CollectedPlanet[];
+  helloReady: boolean;
+  readyClassIds: string[];
+  harvestReady: boolean;
+  claimBadgeCount: number;
+  yards: YardSlot[];
+  walletSprouts: CollectedSprout[];
+  walletWorms: CollectedPlanet[];
+  plantSprout: (uid: string, yardIndex: number) => boolean;
+  unplantYard: (yardIndex: number) => void;
+  boostYard: (wormUid: string, yardIndex: number) => boolean;
+  unboostYard: (wormUid: string, yardIndex?: number) => void;
+  harvestYards: () => boolean;
   missed: MissedWord[];
   setMissed: (words: MissedWord[]) => void;
   clearMissedWord: (word: string) => void;
@@ -208,6 +228,53 @@ function packsFrom(s: ProgressState): string[] {
   return s.packDay === todayIst() ? s.packsToday || EMPTY_IDS : EMPTY_IDS;
 }
 
+function collectibleUid(id: string, claimedAt: string) {
+  return `${id}-${claimedAt}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function migrateSprouts(list?: CollectedSprout[] | (Omit<CollectedSprout, "uid"> & { uid?: string })[]): CollectedSprout[] {
+  if (!Array.isArray(list)) return [];
+  return list.map((item) => {
+    if (item.uid) return item as CollectedSprout;
+    return { ...item, uid: collectibleUid(item.id, item.claimedAt) } as CollectedSprout;
+  });
+}
+
+function migratePlanets(list?: CollectedPlanet[] | (Omit<CollectedPlanet, "uid"> & { uid?: string })[]): CollectedPlanet[] {
+  if (!Array.isArray(list)) return [];
+  return list.map((item) => {
+    if (item.uid) return item as CollectedPlanet;
+    return { ...item, uid: collectibleUid(item.id, item.claimedAt) } as CollectedPlanet;
+  });
+}
+
+function normalizeState(s: ProgressState): ProgressState {
+  return {
+    ...s,
+    sprouts: migrateSprouts(s.sprouts),
+    planets: migratePlanets(s.planets),
+    yards: ensureYards(s.yards),
+  };
+}
+
+function plantedSproutUids(yards: YardSlot[]) {
+  return new Set(yards.map((y) => y.sproutUid).filter(Boolean) as string[]);
+}
+
+function plantedWormUids(yards: YardSlot[]) {
+  const set = new Set<string>();
+  for (const y of yards) {
+    for (const uid of y.wormUids || []) if (uid) set.add(uid);
+  }
+  return set;
+}
+
+function harvestClaimedToday(s: ProgressState) {
+  const day = todayIst();
+  if (s.harvestDay === day) return true;
+  return packsFrom(s).includes(HARVEST_PACK_KEY);
+}
+
 function applyPending(s: ProgressState): ProgressState {
   const c = s.pendingClaim;
   if (!c) return s;
@@ -225,8 +292,26 @@ function applyPending(s: ProgressState): ProgressState {
     streak,
     streakDay,
     lastActiveDay: c.day,
-    sprouts: c.sproutReward ? [...(s.sprouts || []), { ...c.sproutReward, claimedAt: c.day }] : s.sprouts,
-    planets: c.planetReward ? [...(s.planets || []), { ...c.planetReward, claimedAt: c.day }] : s.planets,
+    sprouts: c.sproutReward
+      ? [
+          ...(s.sprouts || []),
+          {
+            ...c.sproutReward,
+            claimedAt: c.day,
+            uid: collectibleUid(c.sproutReward.id, c.day),
+          },
+        ]
+      : s.sprouts,
+    planets: c.planetReward
+      ? [
+          ...(s.planets || []),
+          {
+            ...c.planetReward,
+            claimedAt: c.day,
+            uid: collectibleUid(c.planetReward.id, c.day),
+          },
+        ]
+      : s.planets,
     pendingClaim: nextClaim,
     claimWait: rest,
   };
@@ -319,8 +404,8 @@ function queueHelloPack(s: ProgressState): ProgressState {
     s,
     HELLO_PACK_KEY,
     "Daily Sprouts",
-    "🎁",
-    helloPackSize(attendStreak),
+    "🌱",
+    sproutReward.points,
     {
       attendStreak,
       attendDay: day,
@@ -333,19 +418,39 @@ function queueClassPack(s: ProgressState, classId: string): ProgressState {
   const key = classPackKey(classId);
   const day = todayIst();
   const newClassStreak = continuedClassAttend(s, day);
-  const points = classPackSize(newClassStreak);
   const planetReward = planetRewardForClassStreak(newClassStreak);
   return enqueuePack(
     s,
     key,
-    "Class Bonus",
-    "🪐",
-    points,
+    "Class Worm",
+    "🪱",
+    planetReward.points,
     {
       classAttendStreak: newClassStreak,
       classAttendDay: day,
     },
     { planetReward }
+  );
+}
+
+function queueHarvestPack(s: ProgressState): ProgressState {
+  if (harvestClaimedToday(s)) return s;
+  const yards = ensureYards(s.yards);
+  const grown = yardGardenYield({
+    yards,
+    sprouts: s.sprouts || [],
+    planets: s.planets || [],
+  });
+  if (grown.plantedCount < 1) return s;
+  const day = todayIst();
+  return enqueuePack(
+    s,
+    HARVEST_PACK_KEY,
+    "Yard Harvest",
+    "🌻",
+    grown.finalPoints,
+    { harvestDay: day },
+    { gardenYield: grown }
   );
 }
 
@@ -373,7 +478,7 @@ function queueClaim(s: ProgressState, id: QuestId, prior?: ProgressState): Progr
     kind: "quest",
     activityId: id,
     kid: quest?.kid || "Activity",
-    emoji: quest?.emoji || "🐝",
+    emoji: quest?.emoji || "⭐",
     points,
     streakGain,
     nextStreak,
@@ -403,9 +508,10 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
   const storageKey = userId ? progressStorageKey(userId, childIndex) : "";
 
   const [ready, setReady] = useState(false);
-  const [state, setState] = useState<ProgressState>({ points: 0 });
+  const [state, setState] = useState<ProgressState>({ points: 0, yards: ensureYards() });
   const [cheer, setCheer] = useState<CheerBurst | null>(null);
   const [combo, setCombo] = useState(0);
+  const [readyClassIds, setReadyClassIds] = useState<string[]>([]);
   const comboRef = useRef(0);
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -420,6 +526,7 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
       lastActiveDay: s.lastActiveDay,
       sprouts: s.sprouts || [],
       planets: s.planets || [],
+      yards: ensureYards(s.yards),
       packDay: s.packDay,
       packsToday: s.packsToday,
       pendingClaim: s.pendingClaim || undefined,
@@ -428,6 +535,7 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
       attendDay: s.attendDay,
       classAttendStreak: s.classAttendStreak,
       classAttendDay: s.classAttendDay,
+      harvestDay: s.harvestDay,
       track: s.track,
       missed: s.missed || [],
       todayDone: s.dayKey === todayIst() ? s.todayDone || [] : [],
@@ -476,7 +584,9 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (!mounted) return;
-      const merged = mergeProgressState(local, remoteSnap as any, remoteSyncedAt) as ProgressState;
+      const merged = normalizeState(
+        mergeProgressState(local, remoteSnap as any, remoteSyncedAt) as ProgressState
+      );
       setState(merged);
       setReady(true);
     })().catch(() => {
@@ -607,21 +717,97 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
 
   const grantClassPack = useCallback((classId: string) => {
     let granted = false;
-    let cheerPoints = 0;
     setState((s) => {
       const day = ensureDay(s);
       const key = classPackKey(classId);
       if (packsFrom(day).includes(key)) return day;
       granted = true;
-      cheerPoints = classPackSize(continuedClassAttend(day, todayIst()));
-      const queued = queueClassPack(day, classId);
-      return drainClaims(queued);
+      return queueClassPack(day, classId);
     });
     if (granted) {
-      burst(`Class bonus! +${cheerPoints} Buzz Points`, cheerPoints, "fanfare");
+      setReadyClassIds((prev) => prev.filter((id) => id !== classId));
     }
     return granted;
-  }, [burst]);
+  }, []);
+
+  const plantSprout = useCallback((uid: string, yardIndex: number) => {
+    let ok = false;
+    setState((s) => {
+      const yards = ensureYards(s.yards).map((y) => ({
+        ...y,
+        wormUids: [...(y.wormUids || [])],
+      }));
+      const sprout = (s.sprouts || []).find((row) => row.uid === uid);
+      if (!sprout) return s;
+      if (plantedSproutUids(yards).has(uid)) return s;
+      const slot = yards.find((y) => y.index === yardIndex);
+      if (!slot || slot.sproutUid) return s;
+      slot.sproutUid = uid;
+      ok = true;
+      return { ...s, yards };
+    });
+    return ok;
+  }, []);
+
+  const unplantYard = useCallback((yardIndex: number) => {
+    setState((s) => {
+      const yards = ensureYards(s.yards).map((y) =>
+        y.index === yardIndex ? { index: y.index, wormUids: [] } : { ...y, wormUids: [...(y.wormUids || [])] }
+      );
+      return { ...s, yards };
+    });
+  }, []);
+
+  const boostYard = useCallback((wormUid: string, yardIndex: number) => {
+    let ok = false;
+    setState((s) => {
+      const yards = ensureYards(s.yards).map((y) => ({
+        ...y,
+        wormUids: [...(y.wormUids || [])],
+      }));
+      const worm = (s.planets || []).find((row) => row.uid === wormUid);
+      if (!worm) return s;
+      if (plantedWormUids(yards).has(wormUid)) return s;
+      const slot = yards.find((y) => y.index === yardIndex);
+      if (!slot?.sproutUid) return s;
+      slot.wormUids = [...(slot.wormUids || []), wormUid];
+      ok = true;
+      return { ...s, yards };
+    });
+    return ok;
+  }, []);
+
+  const unboostYard = useCallback((wormUid: string, yardIndex?: number) => {
+    setState((s) => {
+      const yards = ensureYards(s.yards).map((y) => {
+        if (yardIndex !== undefined && y.index !== yardIndex) {
+          return { ...y, wormUids: [...(y.wormUids || [])] };
+        }
+        return {
+          ...y,
+          wormUids: (y.wormUids || []).filter((uid) => uid !== wormUid),
+        };
+      });
+      return { ...s, yards };
+    });
+  }, []);
+
+  const harvestYards = useCallback(() => {
+    let granted = false;
+    setState((s) => {
+      const day = ensureDay(s);
+      if (harvestClaimedToday(day)) return day;
+      const grown = yardGardenYield({
+        yards: day.yards,
+        sprouts: day.sprouts || [],
+        planets: day.planets || [],
+      });
+      if (grown.plantedCount < 1) return day;
+      granted = true;
+      return queueHarvestPack(day);
+    });
+    return granted;
+  }, []);
 
   const setMissed = useCallback((words: MissedWord[]) => {
     setState((s) => ({ ...s, missed: words }));
@@ -640,6 +826,29 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
   const todayDone = snapshot.todayDone;
   const track = useMemo(() => trackFrom(state), [state]);
   const missed = state.missed || EMPTY_MISSED;
+  const yards = useMemo(() => ensureYards(state.yards), [state.yards]);
+  const sprouts = state.sprouts || [];
+  const planets = state.planets || [];
+  const plantedSprouts = useMemo(() => plantedSproutUids(yards), [yards]);
+  const plantedWorms = useMemo(() => plantedWormUids(yards), [yards]);
+  const walletSprouts = useMemo(
+    () => sprouts.filter((s) => s.uid && !plantedSprouts.has(s.uid)),
+    [sprouts, plantedSprouts]
+  );
+  const walletWorms = useMemo(
+    () => planets.filter((p) => p.uid && !plantedWorms.has(p.uid)),
+    [planets, plantedWorms]
+  );
+  const packsToday = packsFrom(state);
+  const helloReady = !packsToday.includes(HELLO_PACK_KEY);
+  const harvestReady =
+    yards.some((y) => Boolean(y.sproutUid)) && !harvestClaimedToday(state);
+  const claimBadgeCount =
+    (helloReady ? 1 : 0) +
+    readyClassIds.length +
+    (harvestReady ? 1 : 0) +
+    (state.pendingClaim ? 1 : 0) +
+    (state.claimWait?.length || 0);
 
   useEffect(() => {
     if (!ready || !userId) return;
@@ -655,6 +864,8 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
     state.lastActiveDay,
     state.sprouts,
     state.planets,
+    state.yards,
+    state.harvestDay,
     state.packDay,
     state.packsToday,
     state.pendingClaim,
@@ -678,7 +889,11 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
         void api.progressLoad().then((remote) => {
           const snap = remote?.snapshot;
           if (!snap) return;
-          setState((prev) => mergeProgressState(prev as Record<string, unknown>, snap, remote?.syncedAt) as ProgressState);
+          setState((prev) =>
+            normalizeState(
+              mergeProgressState(prev as Record<string, unknown>, snap, remote?.syncedAt) as ProgressState
+            )
+          );
         });
       }
     });
@@ -696,24 +911,16 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
         const endedJoined = (data.classes || []).filter(
           (cls) => cls.status === "ended" && cls.joinedByMe
         );
-        if (!endedJoined.length) return;
-
+        const packs = packsFrom(stateRef.current);
+        const readyIds: string[] = [];
         for (const cls of endedJoined) {
           const key = classPackKey(cls.id);
-          if (packsFrom(stateRef.current).includes(key)) continue;
+          if (packs.includes(key)) continue;
           await api.classClaim(cls.id).catch(() => undefined);
           if (cancelled) return;
-          const remote = await api.progressLoad().catch(() => null);
-          if (cancelled) return;
-          if (remote?.snapshot) {
-            setState((prev) =>
-              mergeProgressState(prev as Record<string, unknown>, remote.snapshot, remote.syncedAt) as ProgressState
-            );
-          }
-          if (!packsFrom(stateRef.current).includes(key)) {
-            grantClassPack(cls.id);
-          }
+          readyIds.push(cls.id);
         }
+        if (!cancelled) setReadyClassIds(readyIds);
       } catch {
         // ignore poll errors
       }
@@ -725,14 +932,12 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
       cancelled = true;
       clearInterval(t);
     };
-  }, [ready, userId, grantClassPack]);
+  }, [ready, userId]);
 
   useEffect(() => {
-    const claim = state.pendingClaim;
-    if (!claim?.packKey?.startsWith("class:")) return;
-    const t = setTimeout(() => claimReward(), 12_000);
-    return () => clearTimeout(t);
-  }, [state.pendingClaim, claimReward]);
+    const packs = packsFrom(state);
+    setReadyClassIds((prev) => prev.filter((id) => !packs.includes(classPackKey(id))));
+  }, [state.packsToday, state.packDay]);
 
   const value = useMemo<Ctx>(
     () => ({
@@ -766,11 +971,26 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
       finishQuest,
       grantHelloPack,
       grantClassPack,
-      packsToday: packsFrom(state),
+      packsToday,
       attendStreak: state.attendDay === todayIst() ? state.attendStreak || 0 : 0,
-      classAttendStreak: state.classAttendDay === todayIst() ? state.classAttendStreak || 0 : (state.classAttendStreak || 0),
-      sprouts: state.sprouts || [],
-      planets: state.planets || [],
+      classAttendStreak:
+        state.classAttendDay === todayIst()
+          ? state.classAttendStreak || 0
+          : state.classAttendStreak || 0,
+      sprouts,
+      planets,
+      helloReady,
+      readyClassIds,
+      harvestReady,
+      claimBadgeCount,
+      yards,
+      walletSprouts,
+      walletWorms,
+      plantSprout,
+      unplantYard,
+      boostYard,
+      unboostYard,
+      harvestYards,
       missed,
       setMissed,
       clearMissedWord,
@@ -780,6 +1000,7 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
       state.points,
       state.streak,
       state.pendingClaim,
+      state.claimWait,
       snapshot,
       cheer,
       combo,
@@ -804,14 +1025,25 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
       verbsCleared,
       todayDone,
       track,
-      state.packsToday,
-      state.packDay,
+      packsToday,
       state.attendStreak,
       state.attendDay,
       state.classAttendStreak,
       state.classAttendDay,
-      state.sprouts,
-      state.planets,
+      sprouts,
+      planets,
+      helloReady,
+      readyClassIds,
+      harvestReady,
+      claimBadgeCount,
+      yards,
+      walletSprouts,
+      walletWorms,
+      plantSprout,
+      unplantYard,
+      boostYard,
+      unboostYard,
+      harvestYards,
     ]
   );
 

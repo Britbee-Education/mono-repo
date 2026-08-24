@@ -103,7 +103,25 @@ function metroHost() {
 
 function withDeviceHost(url: string) {
   const raw = (url || "").replace(/\/$/, "") || "http://localhost:3001";
-  if (Platform.OS === "web") return raw;
+  if (Platform.OS === "web") {
+    // Browsing via localhost: stale VPN/LAN IPs in .env break the health gate.
+    // Keep the port from env, but talk to the same machine as the page.
+    if (typeof window !== "undefined") {
+      const pageHost = window.location.hostname;
+      if (pageHost === "localhost" || pageHost === "127.0.0.1") {
+        try {
+          const parsed = new URL(raw.includes("://") ? raw : `http://${raw}`);
+          if (parsed.hostname !== "localhost" && parsed.hostname !== "127.0.0.1") {
+            parsed.hostname = "localhost";
+            return parsed.toString().replace(/\/$/, "");
+          }
+        } catch {
+          return "http://localhost:3001";
+        }
+      }
+    }
+    return raw;
+  }
   const host = metroHost();
   if (!host) return raw;
   try {

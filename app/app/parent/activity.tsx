@@ -4,6 +4,7 @@ import { View, Text, StyleSheet, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { ParentShell } from "@/components/parent/ParentShell";
 import { Card } from "@/components/ui/Card";
+import { EmptyBee } from "@/components/ui/EmptyBee";
 import { useParent } from "@/context/ParentContext";
 import { api, type ParentActivityItem } from "@/lib/api";
 import { activityIcon, relativeTime } from "@/lib/billing";
@@ -81,8 +82,11 @@ export default function ParentActivityScreen() {
         </Card>
       ) : (
         <Card>
-          <Text style={styles.emptyTitle}>No activity yet</Text>
-          <Text style={styles.lead}>When your child practises or you manage billing, updates show here.</Text>
+          <EmptyBee
+            title="No activity yet"
+            message="When your child practises or you manage billing, updates show here."
+            size={88}
+          />
         </Card>
       )}
     </ParentShell>

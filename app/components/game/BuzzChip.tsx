@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Text, StyleSheet, View } from "react-native";
+import { Text, StyleSheet, View, Image } from "react-native";
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -81,7 +81,12 @@ export function BuzzChip() {
           style={StyleSheet.absoluteFillObject}
         />
         <View style={styles.iconWrap}>
-          <Text style={styles.icon}>🐝</Text>
+          <Image
+            source={require("../../assets/bee.png")}
+            style={styles.mascotIcon}
+            resizeMode="contain"
+            accessibilityLabel="Buzz points"
+          />
         </View>
         <Text style={[styles.pillNum, styles.pillNumDark]}>{points}</Text>
         {gain ? (
@@ -146,6 +151,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   icon: { fontSize: 14 },
+  mascotIcon: { width: ICON_SIZE - 4, height: Math.round((ICON_SIZE - 4) * (155 / 232)) },
   pillNum: {
     fontFamily: fonts.extra,
     color: colors.white,

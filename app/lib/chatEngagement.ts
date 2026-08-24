@@ -25,7 +25,7 @@ export const CHAT_CHEERS: ChatCheer[] = [
   { id: "clap", label: "Clap", emoji: "👏" },
   { id: "fire", label: "Fire", emoji: "🔥" },
   { id: "heart", label: "Heart", emoji: "❤️" },
-  { id: "bee", label: "Bee", emoji: "🐝" },
+  { id: "bee", label: "Bee", emoji: "" },
 ];
 
 export const CHAT_MATERIALS: ChatMaterial[] = [
@@ -73,7 +73,7 @@ export const CHAT_MATERIALS: ChatMaterial[] = [
 
 /** @deprecated Legacy emoji sticker ids for old messages only. */
 const LEGACY_STICKER_EMOJI: Record<string, string> = {
-  bee: "🐝",
+  bee: "",
   star: "⭐",
   party: "🎉",
   clap: "👏",
@@ -95,12 +95,21 @@ export function cheerById(id: string) {
   return CHAT_CHEERS.find((c) => c.id === id);
 }
 
+export function cheerUsesMascot(id: string) {
+  return id === "bee";
+}
+
 export function cheerEmoji(id: string) {
+  if (cheerUsesMascot(id)) return "";
   return cheerById(id)?.emoji || LEGACY_STICKER_EMOJI[id] || "✨";
 }
 
 export function legacyStickerEmoji(id: string) {
   return LEGACY_STICKER_EMOJI[id];
+}
+
+export function legacyStickerUsesMascot(id: string) {
+  return id === "bee";
 }
 
 export type ChatSendPayload = {

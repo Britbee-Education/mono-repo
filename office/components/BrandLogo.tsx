@@ -1,13 +1,16 @@
-import logoDark from "../../../.cursor/projects/Users-agnisarvaloka-britbee/assets/logo-dark-d4129fd3-18c0-4a1c-9e11-4d7897874dcb.png";
-
+/**
+ * Full BritBee lockup (mascot + wordmark + tagline) from /logo.png.
+ * Do NOT also render MascotMark on the same surface — that doubles the bee.
+ * Use MascotMark alone on standalone error / not-found pages (outside Shell).
+ */
 export function BrandLogo({ width = 176 }: { width?: number; compact?: boolean }) {
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={logoDark.src}
+      src="/logo.png"
       alt="BritBee"
       width={width}
-      height={Math.round(width * (187 / 281))}
+      height={Math.round(width * (503 / 580))}
       className="brand-logo"
       style={{ display: "block", maxWidth: "100%", height: "auto" }}
     />

@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, Image } from "react-native";
+import { View, Text, StyleSheet, ScrollView } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { BouncePress } from "@/components/game/BouncePress";
 import { HiveAvatar } from "@/components/hive/HiveAvatar";
 import { ScreenDecor } from "@/components/ui/ScreenDecor";
+import { EmptyBee } from "@/components/ui/EmptyBee";
 import { useNotify } from "@/context/NotifyContext";
 import { useProgress } from "@/context/ProgressContext";
 import { useLayout } from "@/lib/layout";
@@ -13,8 +14,6 @@ import { CLASS_PACK, classPackKey } from "@/lib/quests";
 import { NextUnlockLabel } from "@/components/game/NextUnlockLabel";
 import { playSfx } from "@/lib/sfx";
 import { colors, fonts } from "@/constants/theme";
-
-const beeArt = require("../../assets/bee.png");
 
 function classWhen(iso: string) {
   const d = new Date(iso);
@@ -42,7 +41,7 @@ export default function ClassesScreen() {
   const router = useRouter();
   const { headerTop, padX, activityMax } = useLayout();
   const { refresh: refreshInbox } = useNotify();
-  const { grantHelloPack, grantClassPack, packsToday } = useProgress();
+  const { grantClassPack, packsToday } = useProgress();
   const [classes, setClasses] = useState<KidClass[]>([]);
   const [, setTick] = useState(0);
 
@@ -55,8 +54,7 @@ export default function ClassesScreen() {
     useCallback(() => {
       void load();
       void refreshInbox();
-      grantHelloPack();
-    }, [load, refreshInbox, grantHelloPack])
+    }, [load, refreshInbox])
   );
 
   useEffect(() => {
@@ -97,7 +95,7 @@ export default function ClassesScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.screenTitle}>Classes</Text>
-        <Text style={styles.lead}>Live with your mentor. Join for a Buzz Point pack.</Text>
+        <Text style={styles.lead}>Learn with your teacher. Join to get a helper worm!</Text>
 
         {live.length ? <Text style={styles.section}>Live now</Text> : null}
         {live.map((cls) => (
@@ -153,13 +151,13 @@ export default function ClassesScreen() {
               <Ionicons name={canCollect ? "gift" : "checkmark"} size={18} color={canCollect ? colors.listen : colors.muted} />
             </View>
             <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={styles.kicker}>{canCollect ? "Collect bonus" : "Ended"}</Text>
+              <Text style={styles.kicker}>{canCollect ? "Get helper!" : "Ended"}</Text>
               <Text style={[styles.cardTitle, !canCollect && styles.dim]} numberOfLines={1}>
                 {cls.title}
               </Text>
               <Text style={styles.cardSub} numberOfLines={1}>
                 {canCollect
-                  ? `Tap to collect +${CLASS_PACK} Buzz Points · ${cls.guideName}`
+                  ? `Tap Get it! · +${CLASS_PACK} Buzz · helper worm · ${cls.guideName}`
                   : `${classWhen(cls.startsAt)} · ${cls.guideName}`}
               </Text>
             </View>
@@ -169,11 +167,12 @@ export default function ClassesScreen() {
         })}
 
         {empty ? (
-          <View style={styles.empty}>
-            <Image source={beeArt} style={styles.emptyBee} resizeMode="contain" />
-            <Text style={styles.emptyTitle}>No live class yet</Text>
-            <Text style={styles.emptySub}>Your mentor will start a class. Come back and tap Join.</Text>
-          </View>
+          <EmptyBee
+            title="No live class yet"
+            message="Your mentor will start a class. Come back and tap Join."
+            size={120}
+            style={{ paddingTop: 48 }}
+          />
         ) : null}
       </ScrollView>
     </View>
@@ -222,8 +221,4 @@ const styles = StyleSheet.create({
   dim: { color: colors.muted },
   go: { fontFamily: fonts.extra, color: colors.nameRed, fontSize: 14 },
   wait: { fontFamily: fonts.bold, color: colors.muted, fontSize: 13 },
-  empty: { alignItems: "center", paddingTop: 48, paddingHorizontal: 24 },
-  emptyBee: { width: 120, height: 120, marginBottom: 8 },
-  emptyTitle: { fontFamily: fonts.extra, color: colors.navy, fontSize: 18 },
-  emptySub: { fontFamily: fonts.medium, color: colors.muted, marginTop: 4, textAlign: "center" },
 });

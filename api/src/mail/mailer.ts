@@ -207,7 +207,7 @@ export function mailWelcomeParent(input: { userId: string; name: string; email?:
   if (!mailEnabled() || isSyntheticEmail(input.email)) return;
   const html = wrapEmail({
     preheader: "Welcome to BritBee",
-    title: "Welcome to the hive 🐝",
+    title: "Welcome to the hive",
     bodyHtml:
       paragraph(`Hi ${input.name.split(" ")[0] || "there"},`) +
       paragraph(

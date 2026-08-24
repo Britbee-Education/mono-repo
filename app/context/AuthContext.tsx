@@ -10,7 +10,7 @@ type AuthContextValue = {
   verifyOtp: (
     phone: string,
     otp: string,
-    extra?: { name?: string; purpose?: OtpPurpose }
+    extra?: { name?: string; purpose?: OtpPurpose; referralCode?: string }
   ) => Promise<{ isNew: boolean; needsPassword: boolean; resetToken?: string }>;
   setPassword: (password: string) => Promise<void>;
   resetPassword: (phone: string, resetToken: string, password: string) => Promise<void>;
@@ -51,6 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           purpose,
           portal: "mobile",
           name: extra?.name,
+          referralCode: extra?.referralCode || undefined,
         });
         if (res.resetToken) {
           return { isNew: false, needsPassword: true, resetToken: res.resetToken };

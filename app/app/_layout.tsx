@@ -107,6 +107,36 @@ function RootNavigator() {
   );
 }
 
+/** Health URLs to try — primary API first, then localhost fallback for web/dev. */
+function healthCandidates() {
+  const urls = [API_URL];
+  try {
+    const primary = new URL(API_URL.includes("://") ? API_URL : `http://${API_URL}`);
+    if (primary.hostname !== "localhost" && primary.hostname !== "127.0.0.1") {
+      urls.push(`http://localhost:${primary.port || "3001"}`);
+    }
+  } catch {
+    urls.push("http://localhost:3001");
+  }
+  return [...new Set(urls)];
+}
+
+async function pingHealth(base: string) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 2800);
+  try {
+    const res = await fetch(`${base}/health?_=${Date.now()}`, {
+      method: "GET",
+      signal: ctrl.signal,
+    });
+    return res.ok;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function NetworkGate({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [offline, setOffline] = useState(false);
@@ -114,18 +144,15 @@ function NetworkGate({ children }: { children: ReactNode }) {
 
   const checkHealth = useCallback(async () => {
     setChecking(true);
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 2800);
     try {
-      const res = await fetch(`${API_URL}/health?_=${Date.now()}`, {
-        method: "GET",
-        signal: ctrl.signal,
-      });
-      setOffline(!res.ok);
-    } catch {
-      setOffline(true);
+      const bases = healthCandidates();
+      let ok = false;
+      for (const base of bases) {
+        ok = await pingHealth(base);
+        if (ok) break;
+      }
+      setOffline(!ok);
     } finally {
-      clearTimeout(timer);
       setChecking(false);
     }
   }, []);
@@ -146,9 +173,9 @@ function NetworkGate({ children }: { children: ReactNode }) {
     return (
       <BeeStateScreen
         mood="cheer"
-        bubble="No internet right now 🐝"
+        bubble="No internet right now"
         title="Connection Paused"
-        message="Your hive can’t reach the network. Check Wi-Fi or mobile data and we’ll reconnect."
+        message="Your hive can’t reach the BritBee server. Check Wi-Fi, make sure the API is running, then tap Try Again."
         primaryLabel={checking ? "Checking..." : "Try Again"}
         onPrimary={() => void checkHealth()}
         secondaryLabel="Back to welcome"

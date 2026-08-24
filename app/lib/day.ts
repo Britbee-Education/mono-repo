@@ -39,14 +39,27 @@ export function msUntilNextIstMidnight(date = new Date()) {
   return Math.max(0, DAY_MS - istMsIntoDay(date));
 }
 
+function pad2(n: number) {
+  return String(n).padStart(2, "0");
+}
+
+/** Always HH:MM:SS so countdown reads as a live timer. */
 export function formatCountdown(ms: number) {
-  if (ms <= 0) return "soon";
-  const totalSec = Math.ceil(ms / 1000);
-  const mins = Math.floor(totalSec / 60);
-  const hrs = Math.floor(mins / 60);
-  if (hrs >= 1) return `${hrs}h ${mins % 60}m`;
-  if (mins >= 1) return `${mins} min`;
-  return `${totalSec} sec`;
+  if (ms <= 0) return "00:00:00";
+  const totalSec = Math.max(0, Math.ceil(ms / 1000));
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  return `${pad2(h)}:${pad2(m)}:${pad2(s)}`;
+}
+
+export function countdownParts(ms: number) {
+  const totalSec = Math.max(0, Math.ceil(ms / 1000));
+  return {
+    hours: Math.floor(totalSec / 3600),
+    minutes: Math.floor((totalSec % 3600) / 60),
+    seconds: totalSec % 60,
+  };
 }
 
 export type UnlockCountdownKind = "default" | "activities" | "sprout" | "play" | "pack" | "day";

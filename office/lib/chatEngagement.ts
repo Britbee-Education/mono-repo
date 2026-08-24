@@ -5,7 +5,7 @@ export type AttachmentKind = "photo" | "video" | "document";
 export type ChatMaterialId = "sentence" | "story" | "phonics" | "verbs" | "social-play";
 
 const STICKER_EMOJI: Record<string, string> = {
-  bee: "🐝",
+  bee: "",
   star: "⭐",
   party: "🎉",
   clap: "👏",

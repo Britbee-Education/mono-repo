@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeInDown, ZoomIn } from "react-native-reanimated";
 import { ActivityShell } from "@/components/activity/ActivityShell";
+import { EmptyBee } from "@/components/ui/EmptyBee";
 import { SpeakPractice } from "@/components/activity/SpeakPractice";
 import { StepNext } from "@/components/activity/Flow";
 import { ContinueAfter } from "@/components/activity/ContinueAfter";
@@ -47,7 +48,14 @@ export default function PhonicsSoundScreen() {
   if (!sound) {
     return (
       <ActivityShell title="Sound not found" fallback="/activity/phonics">
-        <PillButton label="Back to Sounds" onPress={() => router.replace("/activity/phonics")} />
+        <EmptyBee
+          title="Sound not found"
+          message="That sound isn’t in this hive pack. Pick another from Sounds."
+          size={110}
+        />
+        <View style={{ marginTop: 16 }}>
+          <PillButton label="Back to Sounds" onPress={() => router.replace("/activity/phonics")} />
+        </View>
       </ActivityShell>
     );
   }

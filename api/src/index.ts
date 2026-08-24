@@ -13,6 +13,7 @@ import { guideRouter } from "./routes/guide";
 import { progressRouter } from "./routes/progress";
 import { notifyRouter } from "./routes/notify";
 import { billingRouter } from "./routes/billing";
+import { referralRouter } from "./routes/referral";
 import { startNotifyTick } from "./notifyTick";
 import { memoryDb } from "./memory";
 import { ttsProvider } from "./utils/tts";
@@ -65,6 +66,7 @@ async function main() {
   app.use("/progress", progressRouter);
   app.use("/notifications", notifyRouter);
   app.use("/billing", billingRouter);
+  app.use("/referral", referralRouter);
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`[api] listening on http://localhost:${PORT}`);

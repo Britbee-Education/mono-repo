@@ -1,0 +1,17 @@
+# Edge proxy for BritBee beta on AIC Cloud VPS
+# Hosts come from env (see docker-compose).
+
+{$WEBSITE_HOST:localhost} {
+	encode gzip
+	reverse_proxy website:80
+}
+
+{$API_HOST:api.localhost} {
+	encode gzip
+	reverse_proxy api:3001
+}
+
+{$OFFICE_HOST:office.localhost} {
+	encode gzip
+	reverse_proxy office:3003
+}

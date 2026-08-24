@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
-import { View, Text, StyleSheet, Platform, Image } from "react-native";
+import { View, Text, StyleSheet, Platform } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { BackButton } from "@/components/ui/BackButton";
 import { PillButton } from "@/components/ui/PillButton";
 import { HiveAvatar } from "@/components/hive/HiveAvatar";
 import { ScreenDecor } from "@/components/ui/ScreenDecor";
+import { EmptyBee } from "@/components/ui/EmptyBee";
 import { useAuth } from "@/context/AuthContext";
 import { useProgress } from "@/context/ProgressContext";
 import { useLayout } from "@/lib/layout";
@@ -15,8 +16,6 @@ import { CLASS_PACK, classPackKey } from "@/lib/quests";
 import { clearClassResume, readClassResume, writeClassResume } from "@/lib/classResume";
 import { NextUnlockLabel } from "@/components/game/NextUnlockLabel";
 import { colors, fonts } from "@/constants/theme";
-
-const beeArt = require("../../assets/bee.png");
 
 function classWhen(iso: string) {
   const d = new Date(iso);
@@ -32,7 +31,7 @@ function classWhen(iso: string) {
 export default function LiveClassScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuth();
-  const { grantClassPack, grantHelloPack, packsToday } = useProgress();
+  const { grantClassPack, packsToday } = useProgress();
   const { headerTop, padX, activityMax } = useLayout();
   const [cls, setCls] = useState<KidClass | null>(null);
   const [missing, setMissing] = useState(false);
@@ -61,10 +60,6 @@ export default function LiveClassScreen() {
     const t = setInterval(() => void load(), 2_000);
     return () => clearInterval(t);
   }, [load]);
-
-  useEffect(() => {
-    grantHelloPack();
-  }, [grantHelloPack]);
 
   useEffect(() => {
     if (!cls || !userId) return;
@@ -98,15 +93,20 @@ export default function LiveClassScreen() {
     await WebBrowser.openBrowserAsync(url);
   }
 
-  useEffect(() => {
-    if (!rewardQueued || !cls || cls.status !== "ended") return;
-    void (async () => {
-      await api.classClaim(cls.id).catch(() => undefined);
-      grantClassPack(cls.id);
-      setRewardQueued(false);
-      await clearClassResume(userId);
-    })();
-  }, [rewardQueued, cls, grantClassPack, userId]);
+  async function collectBonus() {
+    if (!cls) return;
+    playSfx("fanfare");
+    await api.classClaim(cls.id).catch(() => undefined);
+    grantClassPack(cls.id);
+    setRewardQueued(false);
+    await clearClassResume(userId);
+  }
+
+  const canClaim =
+    Boolean(cls) &&
+    cls!.status === "ended" &&
+    joined &&
+    !packsToday.includes(classPackKey(cls!.id));
 
   return (
     <View style={styles.root}>
@@ -123,16 +123,17 @@ export default function LiveClassScreen() {
 
       <View style={[styles.body, { paddingHorizontal: padX, maxWidth: activityMax, width: "100%", alignSelf: "center" }]}>
         {missing ? (
-          <>
-            <Text style={styles.heroTitle}>Class not found</Text>
-            <Text style={styles.sub}>Ask your mentor to send a new live class.</Text>
-          </>
+          <EmptyBee
+            title="Class not found"
+            message="Ask your mentor to send a new live class."
+            size={120}
+          />
         ) : !cls ? (
           <Text style={styles.sub}>Opening class…</Text>
         ) : (
           <>
-            <HiveAvatar name={cls.guideName} size={72} maya />
-            <Image source={beeArt} style={styles.bee} resizeMode="contain" />
+            {/* One mascot only — maya avatar already uses bee.png */}
+            <HiveAvatar name={cls.guideName} size={88} maya />
             <Text style={styles.heroTitle}>
               {cls.status === "live"
                 ? `${cls.guideName} is live`
@@ -142,12 +143,12 @@ export default function LiveClassScreen() {
             </Text>
             <Text style={styles.sub}>
               {cls.status === "live"
-                ? `Turn on your camera and say hi. +${CLASS_PACK} Buzz Points pack.`
+                ? `Turn on your camera and say hi. After class you get a helper worm!`
                 : cls.status === "ended"
                   ? packsToday.includes(classPackKey(cls.id))
-                    ? "Buzz Points added to your hive!"
+                    ? "Helper worm is in your bag — add it to a plant in My Garden!"
                     : joined
-                      ? "Collecting your Buzz Points…"
+                      ? "Get your helper worm when you’re ready."
                       : "See you at the next one."
                   : `${classWhen(cls.startsAt)} · ${cls.classKind === "individual" ? "1:1 class" : "Group class"} · ${cls.durationMin} min`}
             </Text>
@@ -165,8 +166,8 @@ export default function LiveClassScreen() {
                         ? `Re-open ${cls.guideName}`
                         : `Join ${cls.guideName}`
                       : joined
-                        ? `Resume · +${CLASS_PACK} Buzz Points`
-                        : `Join · +${CLASS_PACK} Buzz Points`
+                        ? `Resume · helper after class`
+                        : `Join · helper after class`
                   }
                   onPress={() => void join()}
                 />
@@ -184,8 +185,11 @@ export default function LiveClassScreen() {
               </View>
             ) : cls.status === "scheduled" ? (
               <Text style={styles.wait}>Wait here. Join lights up when class starts.</Text>
-            ) : cls.status === "ended" && joined && !packsToday.includes(classPackKey(cls.id)) ? (
-              <Text style={styles.wait}>Your Buzz Points pack is on the way…</Text>
+            ) : canClaim ? (
+              <View style={{ marginTop: 18, width: "100%" }}>
+                <PillButton label={`Get helper! · +${CLASS_PACK} Buzz`} onPress={() => void collectBonus()} />
+                <Text style={styles.wait}>Goes in your bag — add it to a plant in My Garden.</Text>
+              </View>
             ) : null}
           </>
         )}
@@ -206,7 +210,6 @@ const styles = StyleSheet.create({
   title: { fontFamily: fonts.extra, color: colors.navy, fontSize: 18 },
   frame: { flex: 1, paddingBottom: 16, minHeight: 0 },
   body: { alignItems: "center", paddingTop: 28 },
-  bee: { width: 88, height: 88, marginTop: -12, marginBottom: 4 },
   heroTitle: { fontFamily: fonts.extra, color: colors.navy, fontSize: 22, textAlign: "center", marginTop: 8 },
   sub: { fontFamily: fonts.medium, color: colors.muted, textAlign: "center", marginTop: 6, fontSize: 14 },
   note: { fontFamily: fonts.medium, color: colors.ink, textAlign: "center", marginTop: 12, fontSize: 13, lineHeight: 18 },

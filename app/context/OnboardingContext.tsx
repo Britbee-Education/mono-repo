@@ -6,6 +6,7 @@ export type OnboardingDraft = {
   phone: string;
   password: string;
   resetToken: string;
+  referralCode: string;
   childName: string;
   dateOfBirth: string;
   level: "beginner" | "intermediate" | "advanced";
@@ -18,6 +19,7 @@ const defaults: OnboardingDraft = {
   phone: "",
   password: "",
   resetToken: "",
+  referralCode: "",
   childName: "Arjun Sharma",
   dateOfBirth: "12/08/2017",
   level: "beginner",

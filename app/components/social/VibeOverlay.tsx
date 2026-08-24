@@ -8,7 +8,8 @@ import Animated, {
   withDelay,
   withTiming,
 } from "react-native-reanimated";
-import { cheerEmoji, type ChatVibeId, type SocialVibeEvent } from "@/lib/chatEngagement";
+import { cheerEmoji, cheerUsesMascot, type ChatVibeId, type SocialVibeEvent } from "@/lib/chatEngagement";
+import { MascotMark } from "@/components/ui/MascotMark";
 import { fonts } from "@/constants/theme";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
@@ -16,6 +17,7 @@ const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 type ParticleSpec = {
   key: string;
   emoji: string;
+  mascot?: boolean;
   startX: number;
   startY: number;
   driftX: number;
@@ -44,6 +46,7 @@ function particlesForBurst(source: BurstSource): Burst {
   const big = vibe === "celebrate" || vibe === "popper";
   const count = big ? 9 : vibe === "clap" ? 6 : 5;
   const primary = cheerEmoji(String(vibe));
+  const mascot = cheerUsesMascot(String(vibe));
   const accent = big ? "✨" : primary;
   const centerX = SCREEN_W * 0.5;
   const baseY = 88 + Math.min(40, SCREEN_H * 0.04);
@@ -59,6 +62,7 @@ function particlesForBurst(source: BurstSource): Burst {
     particles.push({
       key: `${source.key}-${i}`,
       emoji: big ? (i % 2 === 0 ? primary : accent) : primary,
+      mascot: mascot && !(big && i % 2 !== 0),
       startX: centerX + lane - 14,
       startY: baseY + (i % 2) * 6,
       driftX: Math.cos(angle) * reach * 0.55,
@@ -168,7 +172,11 @@ function FlyingParticle({ particle }: { particle: ParticleSpec }) {
 
   return (
     <Animated.View style={[styles.particle, { left: particle.startX, bottom: particle.startY }, style]}>
-      <Text style={[styles.emoji, { fontSize: particle.size }]}>{particle.emoji}</Text>
+      {particle.mascot ? (
+        <MascotMark size={particle.size + 8} />
+      ) : (
+        <Text style={[styles.emoji, { fontSize: particle.size }]}>{particle.emoji}</Text>
+      )}
       {particle.showName ? <Text style={styles.name}>{particle.showName}</Text> : null}
     </Animated.View>
   );

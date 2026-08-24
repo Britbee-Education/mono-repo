@@ -61,7 +61,7 @@ export function buildRoom(
     name: "",
     hue: 0,
     kind: "system",
-    text: "🐝  Hive is buzzing",
+    text: "Hive is buzzing",
   });
 
   out.push({

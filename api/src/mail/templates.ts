@@ -52,7 +52,7 @@ ${pre}
   <tr><td align="center">
     <table role="presentation" width="560" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #E6E8EE">
       <tr><td style="background:${NAVY};padding:18px 24px">
-        <div style="font-family:Arial,sans-serif;color:${YELLOW};font-size:20px;font-weight:800">🐝 BritBee</div>
+        <div style="font-family:Arial,sans-serif;color:${YELLOW};font-size:20px;font-weight:800">BritBee</div>
         <div style="font-family:Arial,sans-serif;color:#C7D2FE;font-size:12px;margin-top:4px">Practical English for kids</div>
       </td></tr>
       <tr><td style="padding:28px 24px 8px">

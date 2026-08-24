@@ -19,6 +19,8 @@ export type AppSnapshot = {
   // Collections + reward progress (stored so rewards survive reloads/devices).
   sprouts?: unknown[];
   planets?: unknown[];
+  yards?: unknown[];
+  harvestDay?: string;
   packDay?: string;
   packsToday?: string[];
   pendingClaim?: unknown;

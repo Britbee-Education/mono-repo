@@ -354,7 +354,14 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ phone, purpose }),
     }),
-  verifyOtp: (body: { phone: string; otp: string; purpose: OtpPurpose; portal?: string; name?: string }) =>
+  verifyOtp: (body: {
+    phone: string;
+    otp: string;
+    purpose: OtpPurpose;
+    portal?: string;
+    name?: string;
+    referralCode?: string;
+  }) =>
     request<{
       token?: string;
       user?: ApiUser;
@@ -447,6 +454,8 @@ export const api = {
     lastActiveDay?: string;
     sprouts?: unknown[];
     planets?: unknown[];
+    yards?: unknown[];
+    harvestDay?: string;
     packDay?: string;
     packsToday?: string[];
     pendingClaim?: unknown;
@@ -795,6 +804,19 @@ export const api = {
     if (!token) throw new ApiError("Not signed in", 401);
     return request<{ activity: ParentActivityItem[] }>(`/billing/activity?limit=${limit}`, {}, token);
   },
+  referralMe: async () => {
+    const token = await storageGet(TOKEN_KEY);
+    if (!token) throw new ApiError("Not signed in", 401);
+    return request<ReferralMe>("/referral/me", {}, token);
+  },
+  referralClaim: async (code: string) => {
+    const token = await storageGet(TOKEN_KEY);
+    if (!token) throw new ApiError("Not signed in", 401);
+    return request<{ claim: ReferralClaim; me: ReferralMe }>("/referral/claim", {
+      method: "POST",
+      body: JSON.stringify({ code }),
+    }, token);
+  },
 };
 
 export type PaymentMethod = "upi" | "card" | "netbanking";
@@ -830,6 +852,11 @@ export type BillingPayment = {
   createdAt: string;
   completedAt?: string;
   failureReason?: string;
+  /** Referral discount applied at checkout (percent). */
+  discountPct?: number;
+  discountLabel?: string;
+  /** Amount before referral discount (paise). */
+  originalAmount?: number;
 };
 
 export type BillingGatewayConfig = {
@@ -918,6 +945,35 @@ export type KidClass = {
   liveAt?: string;
   endedAt?: string;
   joinedByMe?: boolean;
+};
+
+export type ReferralClaim = {
+  id: string;
+  referredName: string;
+  referredChild?: string;
+  status: string;
+  referrerBuzz: number;
+  referrerDiscountPct: number;
+  createdAt?: string;
+};
+
+export type ReferralMe = {
+  code: string;
+  shareText: string;
+  checkoutDiscountPct: number;
+  wallet?: {
+    totalReferrals: number;
+    buzzEarned: number;
+    nextDiscountPct: number;
+  };
+  rewards?: {
+    referrerBuzz: number;
+    referrerDiscountPer: number;
+    referrerDiscountCap: number;
+    referredBuzz: number;
+    referredWelcomeDiscount: number;
+  };
+  claims: ReferralClaim[];
 };
 
 export function liveJoinUrl(roomUrl: string, displayName: string) {

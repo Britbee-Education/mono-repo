@@ -117,6 +117,12 @@ export default function ParentHubScreen() {
         onPress={() => router.push("/parent/billing")}
       />
       <Tile
+        icon="gift-outline"
+        title="Refer & earn"
+        sub="Invite friends and classmates’ families — earn Buzz Points and plan discounts."
+        onPress={() => router.push("/parent/refer")}
+      />
+      <Tile
         icon="pulse-outline"
         title="Family activity"
         sub="Practice wins, payments, and subscription updates."

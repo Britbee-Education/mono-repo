@@ -31,6 +31,7 @@ import {
   type PlanId,
 } from "../billingStore";
 import { syncUserPlan } from "../billingSync";
+import { guideReferralOverview, listClaimsForReferrer, seedDemoReferrals, getReferralMe } from "../referralStore";
 
 export const guideRouter = Router();
 const learnUpload = multer({
@@ -905,4 +906,52 @@ guideRouter.post("/billing/parents/:userId/subscription/resume", async (req: Aut
   } catch (e) {
     return res.status(400).json({ error: e instanceof Error ? e.message : "Could not resume." });
   }
+});
+
+guideRouter.get("/referrals", async (_req, res) => {
+  const overview = guideReferralOverview();
+  const parents = await users.listByRoles(["parent"]);
+  const byId = new Map(parents.map((u) => [String(u._id), u]));
+  const leaders = overview.leaders.map((row) => {
+    const u = byId.get(row.referrerId);
+    return {
+      ...row,
+      name: u?.name || "Parent",
+      email: (u as { email?: string } | undefined)?.email,
+      phone: u?.phone,
+      childName: (u as { child?: { childName?: string } } | undefined)?.child?.childName,
+    };
+  });
+  const claims = overview.claims.map((c) => {
+    const referrer = byId.get(c.referrerId);
+    const referred = byId.get(c.referredId);
+    return {
+      ...c,
+      referrerName: referrer?.name || (c.note === "Demo sample" ? "Demo parent" : "Parent"),
+      referredName: referred?.name || c.referredName,
+    };
+  });
+  return res.json({ totals: overview.totals, leaders, claims });
+});
+
+guideRouter.get("/referrals/parents/:userId", async (req, res) => {
+  const userId = String(req.params.userId);
+  const user = await users.findById(userId);
+  if (!user) return res.status(404).json({ error: "Parent not found." });
+  const email = (user as { email?: string }).email || "";
+  const me =
+    email.includes("parent@britbee") || String(user.phone || "").includes("9876543210")
+      ? seedDemoReferrals(userId, user.name)
+      : getReferralMe(userId, user.name);
+  return res.json({
+    parent: {
+      id: userId,
+      name: user.name,
+      email: (user as { email?: string }).email,
+      phone: user.phone,
+      childName: (user as { child?: { childName?: string } }).child?.childName,
+    },
+    ...me,
+    claims: listClaimsForReferrer(userId),
+  });
 });

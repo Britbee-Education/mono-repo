@@ -12,7 +12,7 @@ import { useHive } from "@/context/HiveContext";
 import { useParent } from "@/context/ParentContext";
 import { useNotify } from "@/context/NotifyContext";
 import { useLayout } from "@/lib/layout";
-import { nextQuest, questDoneToday, questUnlocked, QUESTS, needFirst, DAILY_QUESTS, todayCount, ACTIVITY_BUZZ, activityPercent, resumeHref, HELLO_PACK_KEY, helloPackSize, classPackSize, planetRewardForClassStreak, sproutRewardForStreak } from "@/lib/quests";
+import { nextQuest, questDoneToday, questUnlocked, QUESTS, needFirst, DAILY_QUESTS, todayCount, ACTIVITY_BUZZ, activityPercent, resumeHref, HELLO_PACK_KEY, planetRewardForClassStreak, sproutRewardForStreak } from "@/lib/quests";
 import { coverArt } from "@/lib/art";
 import { playSfx } from "@/lib/sfx";
 import { colors, fonts } from "@/constants/theme";
@@ -142,29 +142,34 @@ export function HiveRoom() {
     snapshot,
     streak,
     points,
-    rank,
     track,
-    grantHelloPack,
     packsToday,
     attendStreak,
     classAttendStreak,
     sprouts,
     planets,
+    helloReady,
+    readyClassIds,
+    grantHelloPack,
+    grantClassPack,
+    walletSprouts,
+    walletWorms,
   } = useProgress();
   const [packModal, setPackModal] = useState<"daily" | "class" | null>(null);
   const { paused } = useParent();
   const { hive, refresh } = useHive();
-  const { refresh: refreshInbox, unread } = useNotify();
+  const { refresh: refreshInbox } = useNotify();
   const { padX: _padX } = useLayout();
   const meName = user?.child?.childName?.split(" ")[0] || "friend";
   const next = nextQuest(snapshot);
   const todaySprout = sproutRewardForStreak(Math.max(1, attendStreak || 1));
-  const todayPlanet = planetRewardForClassStreak(Math.max(1, classAttendStreak || 1));
+  const todayWorm = planetRewardForClassStreak(Math.max(1, classAttendStreak || 1));
   const unlockMs = useIstDayCountdown();
   const helloClaimed = packsToday.includes(HELLO_PACK_KEY);
   const classPackClaimed = packsToday.some((k) => k.startsWith("class:"));
-  const todaySproutPts = helloPackSize(Math.max(1, attendStreak || 1));
-  const todayPlanetPts = classPackSize(Math.max(1, classAttendStreak || 1));
+  const classReady = readyClassIds.length > 0;
+  const todaySproutPts = todaySprout.points;
+  const todayWormPts = todayWorm.points;
   const pulse = useSharedValue(1);
   useEffect(() => {
     pulse.value = withRepeat(withSequence(withTiming(1.04, motion.enter), withTiming(1, motion.enter)), -1, true);
@@ -175,8 +180,7 @@ export function HiveRoom() {
     useCallback(() => {
       void refresh();
       void refreshInbox();
-      grantHelloPack();
-    }, [refresh, refreshInbox, grantHelloPack])
+    }, [refresh, refreshInbox])
   );
 
   function play(href: string, locked?: boolean, hint?: string) {
@@ -234,7 +238,7 @@ export function HiveRoom() {
                       <NextUnlockLabel kind="activities" style={styles.sub} numberOfLines={1} />
                     ) : (
                       <Text style={styles.sub} numberOfLines={1}>
-                        {helloClaimed ? "Play all 5. Earn a streak." : "Open today's Daily Sprouts."}
+                        {helloClaimed ? "Play all 5. Earn a streak." : "Get today’s plant in My Garden!"}
                       </Text>
                     )}
                   </View>
@@ -291,6 +295,7 @@ export function HiveRoom() {
           kind="daily"
           streak={attendStreak}
           sprouts={sprouts}
+          planets={planets}
           claimedToday={helloClaimed}
         />
         <PackScheduleModal
@@ -306,28 +311,40 @@ export function HiveRoom() {
         <View style={styles.giftRow}>
           <BouncePress
             sound={false}
-            onPress={() => setPackModal("daily")}
+            onPress={() => {
+              if (helloReady) {
+                playSfx("fanfare");
+                grantHelloPack();
+                return;
+              }
+              setPackModal("daily");
+            }}
             style={[styles.sproutsCard, helloClaimed && styles.giftWon]}
           >
             <View style={styles.sproutsTop}>
               <Text style={styles.giftEmoji}>🎁</Text>
               <View style={{ flex: 1, minWidth: 0 }}>
                 <View style={styles.giftTitleRow}>
-                  <Text style={styles.giftTitle}>Daily Sprouts</Text>
+                  <Text style={styles.giftTitle}>Today’s Plant</Text>
                   {attendStreak >= 2 ? (
                     <View style={styles.streakMini}>
                       <Text style={styles.streakMiniTxt}>🔥{attendStreak}</Text>
                     </View>
                   ) : null}
                 </View>
-                <Text style={styles.giftSub} numberOfLines={1}>
-                  {helloClaimed
-                    ? `Next sprout in ${formatCountdown(unlockMs)} · ${sprouts.length} collected`
-                    : `Today: ${todaySprout.label} · +${todaySproutPts} Buzz Points`}
-                </Text>
+                {helloClaimed ? (
+                  <Text style={styles.giftSub} numberOfLines={1}>
+                    <NextUnlockLabel kind="sprout" style={styles.giftSub} />
+                    {` · ${walletSprouts.length} ready to plant`}
+                  </Text>
+                ) : (
+                  <Text style={styles.giftSub} numberOfLines={1}>
+                    {`Get ${todaySprout.label} · +${todaySproutPts} Buzz`}
+                  </Text>
+                )}
               </View>
               <View style={[styles.statusPill, helloClaimed && styles.statusPillDone]}>
-                <Text style={styles.statusPillTxt}>{helloClaimed ? "YAY!" : "READY"}</Text>
+                <Text style={styles.statusPillTxt}>{helloClaimed ? "YAY!" : helloReady ? "GET!" : "SOON"}</Text>
               </View>
               <Ionicons name="chevron-forward" size={14} color={colors.muted} />
             </View>
@@ -335,27 +352,64 @@ export function HiveRoom() {
 
           <BouncePress
             sound={false}
-            onPress={() => setPackModal("class")}
-            style={[styles.giftCard, classPackClaimed && styles.giftWon]}
+            onPress={() => {
+              if (classReady) {
+                playSfx("fanfare");
+                grantClassPack(readyClassIds[0]);
+                return;
+              }
+              if (!classPackClaimed) {
+                router.push("/(main)/classes");
+                return;
+              }
+              setPackModal("class");
+            }}
+            style={[styles.giftCard, classPackClaimed && !classReady && styles.giftWon]}
           >
             <Text style={styles.giftEmoji}>📺</Text>
             <View style={{ flex: 1, minWidth: 0 }}>
               <View style={styles.giftTitleRow}>
-                <Text style={styles.giftTitle}>Class Bonus</Text>
+                <Text style={styles.giftTitle}>Class Helpers</Text>
                 {classAttendStreak >= 2 ? (
                   <View style={[styles.streakMini, styles.streakMiniBlue]}>
                     <Text style={styles.streakMiniTxt}>⚡{classAttendStreak}</Text>
                   </View>
                 ) : null}
               </View>
-              <Text style={styles.giftSub} numberOfLines={1}>
-                {classPackClaimed
-                  ? `Next pack in ${formatCountdown(unlockMs)} · ${planets.length} collected`
-                  : `Today: ${todayPlanet.label} · +${todayPlanetPts} Buzz Points`}
+              {classReady ? (
+                <Text style={styles.giftSub} numberOfLines={1}>
+                  {`Get ${todayWorm.label} · +${todayWormPts} Buzz`}
+                </Text>
+              ) : classPackClaimed ? (
+                <Text style={styles.giftSub} numberOfLines={1}>
+                  <NextUnlockLabel kind="pack" style={styles.giftSub} />
+                  {` · ${walletWorms.length} helpers ready`}
+                </Text>
+              ) : (
+                <Text style={styles.giftSub} numberOfLines={1}>
+                  {`Go to class · get ${todayWorm.label}`}
+                </Text>
+              )}
+            </View>
+            <View style={[styles.statusPill, classPackClaimed && !classReady && styles.statusPillDone]}>
+              <Text style={styles.statusPillTxt}>
+                {classReady ? "GET!" : classPackClaimed ? "YAY!" : "CLASS"}
               </Text>
             </View>
-            <View style={[styles.statusPill, classPackClaimed && styles.statusPillDone]}>
-              <Text style={styles.statusPillTxt}>{classPackClaimed ? "YAY!" : "READY"}</Text>
+            <Ionicons name="chevron-forward" size={14} color={colors.muted} />
+          </BouncePress>
+
+          <BouncePress
+            sound="tap"
+            onPress={() => router.push("/(main)/hive")}
+            style={styles.giftCard}
+          >
+            <Text style={styles.giftEmoji}>🌿</Text>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={styles.giftTitle}>My Garden</Text>
+              <Text style={styles.giftSub} numberOfLines={1}>
+                Plant · add helpers · pick Buzz!
+              </Text>
             </View>
             <Ionicons name="chevron-forward" size={14} color={colors.muted} />
           </BouncePress>

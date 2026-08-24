@@ -163,7 +163,7 @@ export function activityEmoji(type: string) {
     case "subscription":
       return "🔄";
     case "practice":
-      return "🐝";
+      return "📚";
     case "settings":
       return "⚙️";
     case "class":
