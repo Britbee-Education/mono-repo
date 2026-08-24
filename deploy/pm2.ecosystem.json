@@ -1,0 +1,25 @@
+{
+  "apps": [
+    {
+      "name": "britbee-api",
+      "cwd": "/opt/britbee/api",
+      "script": "pnpm",
+      "args": "start",
+      "interpreter": "none",
+      "env": {
+        "NODE_ENV": "production"
+      }
+    },
+    {
+      "name": "britbee-office",
+      "cwd": "/opt/britbee/office",
+      "script": "pnpm",
+      "args": "start",
+      "interpreter": "none",
+      "env": {
+        "NODE_ENV": "production",
+        "NEXT_DIST_DIR": ".next-build"
+      }
+    }
+  ]
+}

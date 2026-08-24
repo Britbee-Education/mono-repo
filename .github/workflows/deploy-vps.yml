@@ -1,7 +1,14 @@
 name: Deploy VPS
 
-# Deploys website, Office (backoffice), API, and Expo web app to AIC Cloud VPS via SSH.
-# Android native builds use the separate "EAS Android" workflow.
+# Auto-deploy on push to master/main:
+# 1) Build website + Office + Expo web in GitHub Actions (not on the 1GB VPS)
+# 2) rsync code + artifacts to /opt/britbee (never overwrites .env)
+# 3) SSH remote-release.sh → pnpm install + nginx + pm2 reload
+#
+# Prerequisites (repo Settings → Secrets / Variables):
+#   secrets: VPS_HOST, VPS_USER, VPS_SSH_KEY, VPS_PORT
+#   vars:    VPS_DEPLOY_ENABLED=true, VPS_APP_DIR=/opt/britbee
+#            EXPO_PUBLIC_API_URL, NEXT_PUBLIC_API_URL (e.g. http://api.britbee.buzz)
 
 on:
   push:
@@ -15,10 +22,71 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    # Set repository variable VPS_DEPLOY_ENABLED=true after SSH secrets are configured.
     if: ${{ vars.VPS_DEPLOY_ENABLED == 'true' }}
+    env:
+      EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL || 'http://api.britbee.buzz' }}
+      NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL || 'http://api.britbee.buzz' }}
+      APP_DIR: ${{ vars.VPS_APP_DIR || '/opt/britbee' }}
     steps:
-      - name: Deploy over SSH
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build website
+        run: pnpm --filter @britbee/website build
+
+      - name: Build office
+        run: pnpm --filter @britbee/office build
+
+      - name: Export Expo web
+        working-directory: app
+        run: EXPO_NO_METRO_WORKSPACE_ROOT=1 pnpm exec expo export --platform web
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p "${{ secrets.VPS_PORT }}" -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Rsync release (preserve server .env)
+        env:
+          HOST: ${{ secrets.VPS_HOST }}
+          USER: ${{ secrets.VPS_USER }}
+          PORT: ${{ secrets.VPS_PORT }}
+        run: |
+          RSYNC_SSH="ssh -i $HOME/.ssh/deploy_key -p ${PORT} -o StrictHostKeyChecking=accept-new"
+          # Ensure remote dir exists
+          $RSYNC_SSH "${USER}@${HOST}" "mkdir -p ${APP_DIR}"
+          rsync -az --delete \
+            --exclude '.git/' \
+            --exclude '.env' \
+            --exclude '.env.*' \
+            --exclude 'node_modules/' \
+            --exclude '**/node_modules/' \
+            --exclude 'office/.next-dev/' \
+            --exclude 'office/.next/' \
+            --exclude 'api/data/' \
+            --exclude 'app/assets/chat/uploads/' \
+            --exclude 'app/assets/billing/proofs/' \
+            --exclude 'app/assets/learn/uploads/' \
+            --exclude '.DS_Store' \
+            --exclude 'agent-transcripts/' \
+            --exclude 'design/' \
+            -e "$RSYNC_SSH" \
+            ./ "${USER}@${HOST}:${APP_DIR}/"
+
+      - name: Remote install + reload
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -28,21 +96,5 @@ jobs:
           script_stop: true
           script: |
             set -euo pipefail
-            APP_DIR="${{ vars.VPS_APP_DIR }}"
-            APP_DIR="${APP_DIR:-$HOME/britbee}"
-            BRANCH="${{ github.ref_name }}"
-            cd "$APP_DIR"
-            git fetch origin
-            git checkout "$BRANCH"
-            git pull --ff-only origin "$BRANCH"
-            export EXPO_PUBLIC_API_URL="${EXPO_PUBLIC_API_URL:-https://api.britbee.app}"
-            export NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL:-https://api.britbee.app}"
-            pnpm install --frozen-lockfile
-            pnpm --filter @britbee/website build
-            pnpm --filter @britbee/office build
-            cd app && EXPO_NO_METRO_WORKSPACE_ROOT=1 pnpm exec expo export --platform web && cd ..
-            pm2 reload "$APP_DIR/deploy/pm2.ecosystem.cjs" --update-env || pm2 start "$APP_DIR/deploy/pm2.ecosystem.cjs"
-            pm2 save
-            curl -fsS "http://127.0.0.1:3001/health" | head -c 200
-            echo
-            echo "Deploy OK @ $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            chmod +x /opt/britbee/deploy/remote-release.sh
+            APP_DIR="/opt/britbee" bash /opt/britbee/deploy/remote-release.sh

@@ -31,7 +31,7 @@ Default hosts:
 | Workflow | File | Triggers | Surfaces |
 |----------|------|----------|----------|
 | **CI** | `.github/workflows/ci.yml` | PR + push to `master`/`main` | Path-filtered builds: website, office, api typecheck, Expo **web** export |
-| **Deploy VPS** | `.github/workflows/deploy-vps.yml` | Push to `master`/`main` + manual | website · office · API · Expo web → AIC Cloud via SSH |
+| **Deploy VPS** | `.github/workflows/deploy-vps.yml` | Push to `master`/`main` + manual | Build in CI → rsync → PM2/Nginx on AIC (`britbee.buzz`) |
 | **EAS Android** | `.github/workflows/eas-android.yml` | Manual + tags `android-v*` | Native **Android** APK/AAB via Expo EAS |
 
 ### Per-surface summary
@@ -44,13 +44,29 @@ Default hosts:
 | Web app (Expo) | `expo export --platform web` | VPS export → Nginx `app.britbee.app` |
 | Android app | — | `eas build --platform android` (`preview` or `production`) |
 
-### Enable VPS deploy
+### Enable VPS deploy (auto on push to master)
 
-1. Add deploy SSH key on the VPS (`authorized_keys`).
-2. GitHub → Settings → Secrets: `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, optional `VPS_PORT`.
-3. GitHub → Variables: `VPS_DEPLOY_ENABLED=true`, optional `VPS_APP_DIR`, `EXPO_PUBLIC_API_URL`.
-4. First-time on VPS: clone repo, `.env.production`, `pnpm install`, seed, `pm2 start deploy/pm2.ecosystem.cjs`, Nginx from `nginx.example.conf`.
-5. After that, pushes to `master` run deploy automatically.
+1. Deploy SSH key on the VPS (`authorized_keys`) — already done for live.
+2. GitHub → **Settings → Secrets and variables → Actions**:
+
+| Secret | Example |
+|--------|---------|
+| `VPS_HOST` | `37.187.140.45` |
+| `VPS_USER` | `root` |
+| `VPS_PORT` | `20006` |
+| `VPS_SSH_KEY` | private key PEM (ed25519) |
+
+| Variable | Example |
+|----------|---------|
+| `VPS_DEPLOY_ENABLED` | `true` |
+| `VPS_APP_DIR` | `/opt/britbee` |
+| `EXPO_PUBLIC_API_URL` | `http://api.britbee.buzz` |
+| `NEXT_PUBLIC_API_URL` | `http://api.britbee.buzz` |
+
+3. Push to `master` (or run **Deploy VPS** → workflow_dispatch).
+4. Pipeline: **build in GitHub Actions** → rsync to VPS (keeps `.env`) → `deploy/remote-release.sh` (pnpm install + nginx + pm2 reload).
+
+AIC port map: `britbee.buzz→80`, `app.britbee.buzz→8080`, `api.britbee.buzz→3001`, `office.britbee.buzz→3003`.
 
 ### Enable Android EAS
 

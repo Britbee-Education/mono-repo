@@ -1,8 +1,5 @@
 /**
- * PM2 — API + Office on AIC Cloud VPS.
- * Website + Expo web: Nginx static (see nginx-ip.conf.template).
- *
- *   pm2 start deploy/pm2.ecosystem.cjs
+ * PM2 ecosystem (JS). Prefer deploy/pm2.ecosystem.json on the VPS (PM2 7).
  */
 const path = require("path");
 const root = path.resolve(__dirname, "..");
@@ -15,9 +12,7 @@ module.exports = {
       script: "pnpm",
       args: "start",
       interpreter: "none",
-      env: {
-        NODE_ENV: "production",
-      },
+      env: { NODE_ENV: "production" },
     },
     {
       name: "britbee-office",
@@ -25,13 +20,7 @@ module.exports = {
       script: "pnpm",
       args: "start",
       interpreter: "none",
-      env: {
-        NODE_ENV: "production",
-        NEXT_DIST_DIR: ".next-build",
-      },
+      env: { NODE_ENV: "production", NEXT_DIST_DIR: ".next-build" },
     },
   ],
 };
-
-// PM2 7 startOrReload expects deploy key present
-module.exports.deploy = module.exports.deploy || {};

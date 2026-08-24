@@ -362,9 +362,12 @@ workflow_dispatch / tag android-v*
 
 | Variable | Purpose |
 |----------|---------|
-| `VPS_DEPLOY_ENABLED=true` | Turns on CD after secrets exist (avoids failed deploys) |
-| `VPS_APP_DIR` | Repo path on the VPS (default `~/britbee`) |
-| `EXPO_PUBLIC_API_URL` | Baked into Android / web (`https://api.britbee.app`) |
+| `VPS_DEPLOY_ENABLED=true` | Turns on auto-deploy on push to master |
+| `VPS_APP_DIR` | `/opt/britbee` |
+| `EXPO_PUBLIC_API_URL` / `NEXT_PUBLIC_API_URL` | e.g. `http://api.britbee.buzz` |
+
+Live CD builds **Office / website / Expo web in GitHub Actions**, then rsyncs to the VPS (server `.env` is never overwritten). The 1GB box only runs `pnpm install` + `pm2 reload`.
+
 
 ### Default public hosts
 
